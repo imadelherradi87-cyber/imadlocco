@@ -9,6 +9,7 @@ import json
 import os
 
 from kivy.app import App
+from kivy.core.window import Window
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -18,9 +19,67 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
 from kivy.metrics import dp
+from kivy.graphics import Color, RoundedRectangle
 
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "cambia_esta_clave"
+
+# ---------- Paleta de colores (cálida, estilo cocina) ----------
+COLOR_BG = (0.98, 0.95, 0.89, 1)        # crema
+COLOR_PRIMARY = (0.80, 0.33, 0.13, 1)   # terracota
+COLOR_PRIMARY_DARK = (0.58, 0.21, 0.08, 1)
+COLOR_ACCENT = (0.35, 0.52, 0.29, 1)    # verde oliva
+COLOR_DANGER = (0.72, 0.20, 0.18, 1)
+COLOR_TEXT = (0.20, 0.13, 0.09, 1)
+COLOR_CARD = (1, 1, 1, 1)
+COLOR_WHITE = (1, 1, 1, 1)
+
+Window.clearcolor = COLOR_BG
+
+
+def flat_button(text, bg_color, text_color=COLOR_WHITE, height=dp(50), font_size="16sp", bold=True):
+    btn = Button(
+        text=text,
+        size_hint_y=None,
+        height=height,
+        background_normal="",
+        background_down="",
+        background_color=bg_color,
+        color=text_color,
+        font_size=font_size,
+        bold=bold,
+    )
+    return btn
+
+
+def autosize_label(text, markup=False, font_size="15sp", color=COLOR_TEXT, bold=False, width_padding=dp(24)):
+    lbl = Label(
+        text=text,
+        markup=markup,
+        font_size=font_size,
+        color=color,
+        bold=bold,
+        size_hint_y=None,
+        halign="left",
+        valign="top",
+    )
+    lbl.text_size = (Window.width - width_padding, None)
+    lbl.bind(texture_size=lambda instance, value: setattr(instance, "height", value[1]))
+    return lbl
+
+
+class RecipeCard(BoxLayout):
+    """Tarjeta blanca con esquinas redondeadas usada como fondo de un botón."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            Color(*COLOR_CARD)
+            self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(12)])
+        self.bind(pos=self._update_rect, size=self._update_rect)
+
+    def _update_rect(self, *args):
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
 
 
 def get_data_path():
@@ -61,33 +120,69 @@ class RecipeListScreen(Screen):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
 
-        header = BoxLayout(size_hint_y=None, height=dp(60), padding=dp(8))
-        title = Label(text="Kocina del Mundo", font_size="22sp", bold=True)
-        admin_btn = Button(text="Admin", size_hint_x=None, width=dp(90))
+        # ---- Encabezado ----
+        header = BoxLayout(
+            size_hint_y=None, height=dp(64), padding=dp(14), spacing=dp(10)
+        )
+        with header.canvas.before:
+            Color(*COLOR_PRIMARY)
+            self._header_rect = RoundedRectangle(pos=header.pos, size=header.size, radius=[0])
+        header.bind(pos=lambda i, v: setattr(self._header_rect, "pos", v))
+        header.bind(size=lambda i, v: setattr(self._header_rect, "size", v))
+
+        title = Label(
+            text="🍲 Kocina del Mundo",
+            font_size="21sp",
+            bold=True,
+            color=COLOR_WHITE,
+            halign="left",
+            valign="middle",
+        )
+        title.bind(size=title.setter("text_size"))
+
+        admin_btn = flat_button("Admin", COLOR_PRIMARY_DARK, height=dp(40), font_size="14sp")
+        admin_btn.size_hint_x = None
+        admin_btn.width = dp(90)
         admin_btn.bind(on_press=self.go_to_login)
+
         header.add_widget(title)
         header.add_widget(admin_btn)
         root.add_widget(header)
 
+        # ---- Lista de recetas ----
         scroll = ScrollView()
-        grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(6), padding=dp(8))
+        grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(10), padding=dp(14))
         grid.bind(minimum_height=grid.setter("height"))
 
         recipes = load_recipes()
         self.manager_data = recipes
 
         if not recipes:
-            grid.add_widget(Label(text="Todavía no hay recetas.", size_hint_y=None, height=dp(40)))
+            grid.add_widget(Label(
+                text="Todavía no hay recetas.",
+                color=COLOR_TEXT,
+                size_hint_y=None,
+                height=dp(40),
+            ))
 
         for index, recipe in enumerate(recipes):
+            card = RecipeCard(size_hint_y=None, height=dp(64), padding=dp(2))
             btn = Button(
                 text=recipe.get("titulo", "Sin título"),
-                size_hint_y=None,
-                height=dp(50),
+                background_normal="",
+                background_down="",
+                background_color=(0, 0, 0, 0),
+                color=COLOR_TEXT,
+                font_size="17sp",
+                bold=True,
+                halign="left",
+                valign="middle",
             )
+            btn.bind(size=lambda i, v: setattr(i, "text_size", v))
             btn.recipe_index = index
             btn.bind(on_press=self.open_recipe)
-            grid.add_widget(btn)
+            card.add_widget(btn)
+            grid.add_widget(card)
 
         scroll.add_widget(grid)
         root.add_widget(scroll)
@@ -112,38 +207,43 @@ class RecipeDetailScreen(Screen):
         recipe = recipes[index]
 
         self.clear_widgets()
-        root = BoxLayout(orientation="vertical", padding=dp(12), spacing=dp(10))
+        root = BoxLayout(orientation="vertical")
 
-        back_btn = Button(text="< Volver", size_hint_y=None, height=dp(45))
+        # ---- Encabezado con botón volver ----
+        header = BoxLayout(size_hint_y=None, height=dp(56), padding=dp(10))
+        with header.canvas.before:
+            Color(*COLOR_PRIMARY)
+            self._header_rect = RoundedRectangle(pos=header.pos, size=header.size, radius=[0])
+        header.bind(pos=lambda i, v: setattr(self._header_rect, "pos", v))
+        header.bind(size=lambda i, v: setattr(self._header_rect, "size", v))
+
+        back_btn = flat_button("< Volver", COLOR_PRIMARY_DARK, height=dp(40), font_size="14sp")
+        back_btn.size_hint_x = None
+        back_btn.width = dp(100)
         back_btn.bind(on_press=self.go_back)
-        root.add_widget(back_btn)
+        header.add_widget(back_btn)
+        header.add_widget(Label())  # spacer
+        root.add_widget(header)
 
-        title = Label(
-            text=recipe.get("titulo", ""),
-            font_size="20sp",
-            bold=True,
-            size_hint_y=None,
-            height=dp(40),
-        )
-        root.add_widget(title)
-
+        # ---- Contenido con scroll ----
         scroll = ScrollView()
-        content = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(10), padding=dp(4))
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None, spacing=dp(16), padding=dp(18)
+        )
         content.bind(minimum_height=content.setter("height"))
 
-        content.add_widget(Label(
-            text="[b]Ingredientes:[/b]\n" + recipe.get("ingredientes", ""),
-            markup=True,
-            size_hint_y=None,
-            text_size=(self.width - dp(24), None),
-            halign="left",
+        content.add_widget(autosize_label(
+            recipe.get("titulo", ""), font_size="23sp", bold=True, color=COLOR_PRIMARY_DARK
         ))
-        content.add_widget(Label(
-            text="[b]Preparación:[/b]\n" + recipe.get("pasos", ""),
-            markup=True,
-            size_hint_y=None,
-            text_size=(self.width - dp(24), None),
-            halign="left",
+
+        content.add_widget(autosize_label(
+            "[b]🧂 Ingredientes[/b]\n" + recipe.get("ingredientes", ""),
+            markup=True, font_size="16sp",
+        ))
+
+        content.add_widget(autosize_label(
+            "[b]👩‍🍳 Preparación[/b]\n" + recipe.get("pasos", ""),
+            markup=True, font_size="16sp",
         ))
 
         scroll.add_widget(content)
@@ -162,23 +262,32 @@ class LoginScreen(Screen):
 
     def build_ui(self):
         self.clear_widgets()
-        root = BoxLayout(orientation="vertical", padding=dp(24), spacing=dp(14))
+        root = BoxLayout(orientation="vertical", padding=dp(28), spacing=dp(16))
 
-        root.add_widget(Label(text="Acceso de administrador", font_size="20sp", bold=True,
-                               size_hint_y=None, height=dp(40)))
+        root.add_widget(Label(
+            text="🔐 Acceso de administrador",
+            font_size="21sp", bold=True, color=COLOR_PRIMARY_DARK,
+            size_hint_y=None, height=dp(44),
+        ))
 
-        self.username_input = TextInput(hint_text="Usuario", multiline=False, size_hint_y=None, height=dp(48))
-        self.password_input = TextInput(hint_text="Contraseña", password=True, multiline=False,
-                                         size_hint_y=None, height=dp(48))
+        self.username_input = TextInput(
+            hint_text="Usuario", multiline=False, size_hint_y=None, height=dp(50),
+            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(14)],
+        )
+        self.password_input = TextInput(
+            hint_text="Contraseña", password=True, multiline=False,
+            size_hint_y=None, height=dp(50),
+            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(14)],
+        )
 
         root.add_widget(self.username_input)
         root.add_widget(self.password_input)
 
-        login_btn = Button(text="Iniciar sesión", size_hint_y=None, height=dp(50))
+        login_btn = flat_button("Iniciar sesión", COLOR_ACCENT, height=dp(52))
         login_btn.bind(on_press=self.try_login)
         root.add_widget(login_btn)
 
-        cancel_btn = Button(text="Cancelar", size_hint_y=None, height=dp(45))
+        cancel_btn = flat_button("Cancelar", COLOR_DANGER, height=dp(46))
         cancel_btn.bind(on_press=self.cancel)
         root.add_widget(cancel_btn)
 
@@ -212,31 +321,44 @@ class AddRecipeScreen(Screen):
 
     def build_ui(self):
         self.clear_widgets()
-        root = BoxLayout(orientation="vertical", padding=dp(16), spacing=dp(10))
+        scroll = ScrollView()
+        root = BoxLayout(
+            orientation="vertical", padding=dp(20), spacing=dp(12), size_hint_y=None
+        )
+        root.bind(minimum_height=root.setter("height"))
 
-        root.add_widget(Label(text="Nueva receta", font_size="20sp", bold=True,
-                               size_hint_y=None, height=dp(40)))
+        root.add_widget(Label(
+            text="📝 Nueva receta", font_size="21sp", bold=True, color=COLOR_PRIMARY_DARK,
+            size_hint_y=None, height=dp(44),
+        ))
 
-        self.title_input = TextInput(hint_text="Título", multiline=False,
-                                      size_hint_y=None, height=dp(48))
-        self.ingredients_input = TextInput(hint_text="Ingredientes", multiline=True,
-                                            size_hint_y=None, height=dp(120))
-        self.steps_input = TextInput(hint_text="Preparación", multiline=True,
-                                      size_hint_y=None, height=dp(160))
+        self.title_input = TextInput(
+            hint_text="Título", multiline=False, size_hint_y=None, height=dp(50),
+            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(14)],
+        )
+        self.ingredients_input = TextInput(
+            hint_text="Ingredientes", multiline=True, size_hint_y=None, height=dp(120),
+            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(10)],
+        )
+        self.steps_input = TextInput(
+            hint_text="Preparación", multiline=True, size_hint_y=None, height=dp(160),
+            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(10)],
+        )
 
         root.add_widget(self.title_input)
         root.add_widget(self.ingredients_input)
         root.add_widget(self.steps_input)
 
-        save_btn = Button(text="Guardar receta", size_hint_y=None, height=dp(50))
+        save_btn = flat_button("Guardar receta", COLOR_ACCENT, height=dp(52))
         save_btn.bind(on_press=self.save_recipe)
         root.add_widget(save_btn)
 
-        back_btn = Button(text="Volver al panel", size_hint_y=None, height=dp(45))
+        back_btn = flat_button("Volver al panel", COLOR_PRIMARY_DARK, height=dp(46))
         back_btn.bind(on_press=self.go_back)
         root.add_widget(back_btn)
 
-        self.add_widget(root)
+        scroll.add_widget(root)
+        self.add_widget(scroll)
 
     def save_recipe(self, instance):
         title = self.title_input.text.strip()
