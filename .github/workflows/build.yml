@@ -28,7 +28,16 @@ jobs:
 
       - name: Build APK with buildozer
         run: |
-          yes | buildozer -v android debug
+          yes | buildozer -v android debug 2>&1 | tee build_full.log
+          echo "===== ERROR SUMMARY ====="
+          grep -i -E "error|failed|not found|traceback" build_full.log | tail -n 40
+
+      - name: Upload full log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-build-log
+          path: build_full.log
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
