@@ -10,6 +10,7 @@ import io
 
 from kivy.app import App
 from kivy.core.window import Window
+from kivy.metrics import dp
 from kivy.core.image import Image as CoreImage
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
@@ -21,7 +22,6 @@ from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
 from kivy.uix.popup import Popup
-from kivy.metrics import dp
 from kivy.graphics import Color, RoundedRectangle, Rectangle
 
 ADMIN_USERNAME = "admin"
@@ -54,6 +54,7 @@ def _load_logo_texture():
         return core_img.texture
     except Exception:
         return None
+
 
 _LOGO_TEXTURE = _load_logo_texture()
 LOGO_HEIGHT = dp(44)
