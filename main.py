@@ -24,6 +24,13 @@ from kivy.uix.spinner import Spinner
 from kivy.uix.popup import Popup
 from kivy.graphics import Color, RoundedRectangle, Rectangle
 
+from constants import (
+    ADMIN_USERNAME, ADMIN_PASSWORD, CATEGORIES,
+    COLOR_BG, COLOR_PRIMARY, COLOR_PRIMARY_DARK, COLOR_ACCENT,
+    COLOR_DANGER, COLOR_TEXT, COLOR_CARD, COLOR_WHITE,
+)
+
+Window.clearcolor = COLOR_BG
 Window.clearcolor = COLOR_BG
 
 # ---------- Logo (cargado desde logo_data.py en base64) ----------
