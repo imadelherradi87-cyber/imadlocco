@@ -19,12 +19,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip openjdk-17-jdk cmake ninja-build \
-            autoconf automake libtool libtool-bin libltdl-dev autoconf-archive \
-            build-essential pkg-config \
-            libffi-dev libssl-dev \
-            zlib1g-dev libncurses5-dev
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev cmake ninja-build
 
       - name: Install buildozer
         run: |
@@ -32,10 +27,16 @@ jobs:
           pip install buildozer cython
 
       - name: Build APK with buildozer
+        shell: bash
         run: |
+          set -o pipefail
           yes | buildozer -v android debug 2>&1 | tee build_full.log
+
+      - name: Show error summary
+        if: always()
+        run: |
           echo "===== ERROR SUMMARY ====="
-          grep -i -E "error|failed|not found|traceback" build_full.log | tail -n 40
+          grep -i -E "error|failed|not found|traceback" build_full.log | tail -n 60 || echo "No obvious error lines found — check full log."
 
       - name: Upload full log
         if: always()
@@ -45,6 +46,7 @@ jobs:
           path: build_full.log
 
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: kocina-del-mundo-apk
