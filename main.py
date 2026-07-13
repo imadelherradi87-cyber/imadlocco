@@ -5,24 +5,20 @@ Una app de recetas de cocina en español.
 
 import json
 import os
-import base64
-import io
 
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
-from kivy.core.image import Image as CoreImage
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
 from kivy.uix.popup import Popup
-from kivy.graphics import Color, RoundedRectangle, Rectangle
+from kivy.graphics import Color, RoundedRectangle
 
 from constants import (
     ADMIN_USERNAME, ADMIN_PASSWORD, CATEGORIES,
@@ -32,12 +28,8 @@ from constants import (
 
 Window.clearcolor = COLOR_BG
 
-Window.clearcolor = COLOR_BG
-
 from logo import LOGO_TEXTURE, LOGO_HEIGHT, LOGO_WIDTH, LogoImage
 
-
-def flat_button(text, bg_color, text_color=COLOR_WHITE, height=dp(50), font_size="16sp", bold=True):
 
 def flat_button(text, bg_color, text_color=COLOR_WHITE, height=dp(50), font_size="16sp", bold=True):
     return Button(
@@ -110,8 +102,8 @@ def make_header():
     header.bind(pos=lambda i, v: setattr(rect, "pos", v))
     header.bind(size=lambda i, v: setattr(rect, "size", v))
 
-    if _LOGO_TEXTURE:
-        logo = LogoImage(texture=_LOGO_TEXTURE, size_hint=(None, None),
+    if LOGO_TEXTURE:
+        logo = LogoImage(texture=LOGO_TEXTURE, size_hint=(None, None),
                           width=LOGO_WIDTH, height=LOGO_HEIGHT)
     else:
         logo = Label(text="Kocina del Mundo", font_size="20sp", bold=True, color=COLOR_WHITE)
