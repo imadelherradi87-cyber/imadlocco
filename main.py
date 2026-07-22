@@ -1,14 +1,15 @@
 """
 Kocina del Mundo
-Una app de recetas de cocina en español.
+App nativa que refleja la estructura real del sitio
+https://kocinadelmundo24.blogspot.com (recetas cargadas en vivo desde Blogger).
 """
 
-import json
-import os
+import webbrowser
 
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
+from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -16,12 +17,11 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
-from kivy.uix.spinner import Spinner
-from kivy.uix.popup import Popup
+from kivy.uix.image import AsyncImage
 from kivy.graphics import Color, RoundedRectangle
 
 from constants import (
-    ADMIN_USERNAME, ADMIN_PASSWORD, CATEGORIES,
+    CATEGORIES, BLOG_URL,
     COLOR_BG, COLOR_PRIMARY, COLOR_PRIMARY_DARK, COLOR_ACCENT,
     COLOR_DANGER, COLOR_TEXT, COLOR_CARD, COLOR_WHITE,
 )
@@ -29,7 +29,12 @@ from constants import (
 Window.clearcolor = COLOR_BG
 
 from logo import LOGO_TEXTURE, LOGO_HEIGHT, LOGO_WIDTH, LogoImage
+from blogger_api import fetch_posts
 
+
+# ---------------------------------------------------------------------------
+# Helpers de UI (mismo estilo que antes)
+# ---------------------------------------------------------------------------
 
 def flat_button(text, bg_color, text_color=COLOR_WHITE, height=dp(50), font_size="16sp", bold=True):
     return Button(
@@ -63,235 +68,286 @@ class RecipeCard(BoxLayout):
         self.bg_rect.size = self.size
 
 
-def get_data_path():
-    app = App.get_running_app()
-    if app:
-        return os.path.join(app.user_data_dir, "recetas.json")
-    return "recetas.json"
-
-
-def load_recipes():
-    path = get_data_path()
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return [
-        {
-            "titulo": "Tortilla Española",
-            "categoria": "Cocina Española",
-            "ingredientes": "6 huevos, 4 patatas, 1 cebolla, aceite de oliva, sal",
-            "pasos": "1. Pela y corta las patatas y la cebolla.\n"
-                      "2. Fríelas en aceite hasta que estén blandas.\n"
-                      "3. Bate los huevos y mezcla con las patatas.\n"
-                      "4. Cuaja la mezcla en la sartén por ambos lados.",
-        }
-    ]
-
-
-def save_recipes(recipes):
-    path = get_data_path()
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(recipes, f, ensure_ascii=False, indent=2)
-
-
-def make_header():
+def make_header(show_back=False, on_back=None):
     header = BoxLayout(size_hint_y=None, height=dp(64), padding=dp(10), spacing=dp(8))
     with header.canvas.before:
         Color(*COLOR_PRIMARY)
         rect = RoundedRectangle(pos=header.pos, size=header.size, radius=[0])
-    header.bind(pos=lambda i, v: setattr(rect, "pos", v))
-    header.bind(size=lambda i, v: setattr(rect, "size", v))
+        header.bind(pos=lambda i, v: setattr(rect, "pos", v))
+        header.bind(size=lambda i, v: setattr(rect, "size", v))
+
+    if show_back:
+        back_btn = flat_button("< Volver", COLOR_PRIMARY_DARK, height=dp(40), font_size="13sp")
+        back_btn.size_hint_x = None
+        back_btn.width = dp(90)
+        if on_back:
+            back_btn.bind(on_press=on_back)
+        header.add_widget(back_btn)
 
     if LOGO_TEXTURE:
         logo = LogoImage(texture=LOGO_TEXTURE, size_hint=(None, None),
                           width=LOGO_WIDTH, height=LOGO_HEIGHT)
     else:
-        logo = Label(text="Kocina del Mundo", font_size="20sp", bold=True, color=COLOR_WHITE)
-
+        logo = Label(text="Kocina del Mundo", font_size="18sp", bold=True, color=COLOR_WHITE)
     header.add_widget(logo)
     return header
 
 
-class RecipeListScreen(Screen):
+def make_recipe_card(post, on_press):
+    """Tarjeta de receta con miniatura, título y fecha (igual que la web)."""
+    card = RecipeCard(orientation="horizontal", size_hint_y=None, height=dp(96),
+                       padding=dp(8), spacing=dp(10))
+
+    if post.get("imagen"):
+        thumb = AsyncImage(source=post["imagen"], size_hint=(None, None),
+                            width=dp(80), height=dp(80))
+    else:
+        thumb = BoxLayout(size_hint=(None, None), width=dp(80), height=dp(80))
+    card.add_widget(thumb)
+
+    info = BoxLayout(orientation="vertical", spacing=dp(4))
+    title_lbl = autosize_label(post.get("titulo", ""), font_size="16sp", bold=True,
+                                color=COLOR_TEXT, width_padding=dp(120))
+    info.add_widget(title_lbl)
+    if post.get("categorias"):
+        cat_lbl = autosize_label(" · ".join(post["categorias"][:3]), font_size="12sp",
+                                  color=COLOR_ACCENT, width_padding=dp(120))
+        info.add_widget(cat_lbl)
+    card.add_widget(info)
+
+    btn = Button(background_normal="", background_down="", background_color=(0, 0, 0, 0))
+    btn.bind(on_press=lambda i: on_press(post))
+    card.add_widget(btn)
+    return card
+
+
+def loading_label(text="Cargando recetas..."):
+    return Label(text=text, color=COLOR_TEXT, size_hint_y=None, height=dp(60), font_size="15sp")
+
+
+def error_label(text="No se pudieron cargar las recetas. Revisa tu conexión."):
+    return Label(text=text, color=COLOR_DANGER, size_hint_y=None, height=dp(60), font_size="14sp")
+
+
+# ---------------------------------------------------------------------------
+# Home: refleja la portada del sitio (destacadas + categorías + rejilla)
+# ---------------------------------------------------------------------------
+
+class HomeScreen(Screen):
     def on_pre_enter(self, *args):
         self.build_ui()
+        self.load_posts()
 
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        header = make_header()
+        root.add_widget(make_header())
 
-        cat_btn = flat_button("☰ Categorías", COLOR_PRIMARY_DARK, height=dp(40), font_size="13sp")
-        cat_btn.size_hint_x = None
-        cat_btn.width = dp(110)
-        cat_btn.bind(on_press=self.go_to_categories)
+        # Barra de búsqueda
+        search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
+        self.search_input = TextInput(
+            hint_text="Buscar recetas...", multiline=False,
+            background_color=COLOR_CARD, foreground_color=COLOR_TEXT,
+            size_hint_x=1, padding=[dp(10), dp(10)],
+        )
+        self.search_input.bind(on_text_validate=self.do_search)
+        search_btn = flat_button("Buscar", COLOR_ACCENT, height=dp(44), font_size="13sp")
+        search_btn.size_hint_x = None
+        search_btn.width = dp(90)
+        search_btn.bind(on_press=self.do_search)
+        search_bar.add_widget(self.search_input)
+        search_bar.add_widget(search_btn)
+        root.add_widget(search_bar)
 
-        admin_btn = flat_button("Admin", COLOR_PRIMARY_DARK, height=dp(40), font_size="14sp")
-        admin_btn.size_hint_x = None
-        admin_btn.width = dp(80)
-        admin_btn.bind(on_press=self.go_to_login)
+        # Categorías principales (igual que el menú de la web)
+        cat_scroll = ScrollView(size_hint_y=None, height=dp(56), do_scroll_y=False, do_scroll_x=True)
+        cat_row = BoxLayout(size_hint_x=None, spacing=dp(8), padding=(dp(10), dp(6)))
+        cat_row.bind(minimum_width=cat_row.setter("width"))
+        for cat_name in CATEGORIES.keys():
+            btn = flat_button(cat_name, COLOR_PRIMARY_DARK, height=dp(44), font_size="13sp")
+            btn.size_hint_x = None
+            btn.width = dp(120)
+            btn.category_name = cat_name
+            btn.bind(on_press=self.open_category)
+            cat_row.add_widget(btn)
+        cat_scroll.add_widget(cat_row)
+        root.add_widget(cat_scroll)
 
-        header.add_widget(Label())
-        header.add_widget(cat_btn)
-        header.add_widget(admin_btn)
-        root.add_widget(header)
+        # Contenedor de resultados (se llena al cargar)
+        self.results_scroll = ScrollView()
+        self.results_grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(10), padding=dp(14))
+        self.results_grid.bind(minimum_height=self.results_grid.setter("height"))
+        self.results_grid.add_widget(loading_label())
+        self.results_scroll.add_widget(self.results_grid)
+        root.add_widget(self.results_scroll)
 
-        app = App.get_running_app()
-        active_filter = getattr(app, "selected_category", None)
-
-        if active_filter:
-            filter_bar = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(14), dp(4)), spacing=dp(8))
-            filter_bar.add_widget(Label(
-                text=f"Filtrando: {active_filter}", color=COLOR_TEXT, font_size="13sp",
-            ))
-            clear_btn = flat_button("✕ Quitar filtro", COLOR_DANGER, height=dp(32), font_size="12sp")
-            clear_btn.size_hint_x = None
-            clear_btn.width = dp(130)
-            clear_btn.bind(on_press=self.clear_filter)
-            filter_bar.add_widget(clear_btn)
-            root.add_widget(filter_bar)
-
-        scroll = ScrollView()
-        grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(10), padding=dp(14))
-        grid.bind(minimum_height=grid.setter("height"))
-
-        recipes = load_recipes()
-        if active_filter:
-            recipes = [r for r in recipes if r.get("categoria") == active_filter]
-        self.manager_data = recipes
-
-        if not recipes:
-            grid.add_widget(Label(
-                text="No hay recetas en esta categoría todavía.",
-                color=COLOR_TEXT, size_hint_y=None, height=dp(40),
-            ))
-
-        for index, recipe in enumerate(recipes):
-            card = RecipeCard(size_hint_y=None, height=dp(64), padding=dp(2))
-            btn = Button(
-                text=recipe.get("titulo", "Sin título"),
-                background_normal="", background_down="", background_color=(0, 0, 0, 0),
-                color=COLOR_TEXT, font_size="17sp", bold=True, halign="left", valign="middle",
-            )
-            btn.bind(size=lambda i, v: setattr(i, "text_size", v))
-            btn.recipe_index = index
-            btn.bind(on_press=self.open_recipe)
-            card.add_widget(btn)
-            grid.add_widget(card)
-
-        scroll.add_widget(grid)
-        root.add_widget(scroll)
         self.add_widget(root)
 
-    def open_recipe(self, instance):
+    def load_posts(self, query=None):
+        self.results_grid.clear_widgets()
+        self.results_grid.add_widget(loading_label())
+        fetch_posts(self.show_posts, on_error=self.show_error, query=query, max_results=20)
+
+    def show_posts(self, posts):
+        self.results_grid.clear_widgets()
+        self.results_grid.add_widget(autosize_label(
+            "Últimas recetas" if not posts else f"Últimas recetas ({len(posts)})",
+            font_size="17sp", bold=True, color=COLOR_PRIMARY_DARK,
+        ))
+        if not posts:
+            self.results_grid.add_widget(Label(
+                text="No se encontraron recetas.", color=COLOR_TEXT,
+                size_hint_y=None, height=dp(40),
+            ))
+        for post in posts:
+            self.results_grid.add_widget(make_recipe_card(post, self.open_detail))
+
+    def show_error(self, err):
+        self.results_grid.clear_widgets()
+        self.results_grid.add_widget(error_label())
+
+    def do_search(self, instance):
+        query = self.search_input.text.strip()
+        if query:
+            self.load_posts(query=query)
+        else:
+            self.load_posts()
+
+    def open_category(self, instance):
+        cat_screen = self.manager.get_screen("category")
+        cat_screen.set_category(instance.category_name)
+        self.manager.transition = SlideTransition(direction="left")
+        self.manager.current = "category"
+
+    def open_detail(self, post):
         detail_screen = self.manager.get_screen("detail")
-        detail_screen.load_recipe(instance.recipe_index, self.manager_data)
+        detail_screen.show_post(post)
         self.manager.transition = SlideTransition(direction="left")
         self.manager.current = "detail"
 
-    def go_to_login(self, instance):
-        self.manager.transition = SlideTransition(direction="up")
-        self.manager.current = "login"
 
-    def go_to_categories(self, instance):
-        self.manager.transition = SlideTransition(direction="down")
-        self.manager.current = "categories"
+# ---------------------------------------------------------------------------
+# Categoría: muestra subcategorías reales + recetas filtradas
+# ---------------------------------------------------------------------------
 
-    def clear_filter(self, instance):
-        App.get_running_app().selected_category = None
+class CategoryScreen(Screen):
+    current_category = None
+
+    def set_category(self, category_name):
+        self.current_category = category_name
         self.build_ui()
-
-
-class CategoriesScreen(Screen):
-    def on_pre_enter(self, *args):
-        self.build_ui()
+        self.load_posts(category_name)
 
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        header = make_header()
-        back_btn = flat_button("< Volver", COLOR_PRIMARY_DARK, height=dp(40), font_size="13sp")
-        back_btn.size_hint_x = None
-        back_btn.width = dp(100)
-        back_btn.bind(on_press=self.go_back)
-        header.add_widget(Label())
-        header.add_widget(back_btn)
-        root.add_widget(header)
+        root.add_widget(make_header(show_back=True, on_back=self.go_back))
 
-        scroll = ScrollView()
-        grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(10), padding=dp(14))
-        grid.bind(minimum_height=grid.setter("height"))
-
-        grid.add_widget(Label(
-            text="📋 Categorías", font_size="20sp", bold=True, color=COLOR_PRIMARY_DARK,
-            size_hint_y=None, height=dp(40),
+        root.add_widget(autosize_label(
+            self.current_category or "", font_size="20sp", bold=True,
+            color=COLOR_PRIMARY_DARK, width_padding=dp(24),
         ))
 
-        for cat in CATEGORIES:
-            card = RecipeCard(size_hint_y=None, height=dp(56), padding=dp(2))
-            btn = Button(
-                text=cat, background_normal="", background_down="", background_color=(0, 0, 0, 0),
-                color=COLOR_TEXT, font_size="16sp", bold=True, halign="left", valign="middle",
-            )
-            btn.bind(size=lambda i, v: setattr(i, "text_size", v))
-            btn.category_name = cat
-            btn.bind(on_press=self.select_category)
-            card.add_widget(btn)
-            grid.add_widget(card)
+        # Subcategorías reales como chips
+        subcats = CATEGORIES.get(self.current_category, [])
+        chip_scroll = ScrollView(size_hint_y=None, height=dp(50), do_scroll_y=False, do_scroll_x=True)
+        chip_row = BoxLayout(size_hint_x=None, spacing=dp(6), padding=(dp(10), dp(4)))
+        chip_row.bind(minimum_width=chip_row.setter("width"))
 
-        scroll.add_widget(grid)
-        root.add_widget(scroll)
+        all_btn = flat_button("Todo", COLOR_ACCENT, height=dp(38), font_size="12sp")
+        all_btn.size_hint_x = None
+        all_btn.width = dp(80)
+        all_btn.bind(on_press=lambda i: self.load_posts(self.current_category))
+        chip_row.add_widget(all_btn)
+
+        for sub in subcats:
+            chip = flat_button(sub, COLOR_PRIMARY_DARK, height=dp(38), font_size="12sp")
+            chip.size_hint_x = None
+            chip.width = dp(110)
+            chip.sub_name = sub
+            chip.bind(on_press=lambda i: self.load_posts(i.sub_name))
+            chip_row.add_widget(chip)
+
+        chip_scroll.add_widget(chip_row)
+        root.add_widget(chip_scroll)
+
+        self.results_scroll = ScrollView()
+        self.results_grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(10), padding=dp(14))
+        self.results_grid.bind(minimum_height=self.results_grid.setter("height"))
+        self.results_scroll.add_widget(self.results_grid)
+        root.add_widget(self.results_scroll)
+
         self.add_widget(root)
 
-    def select_category(self, instance):
-        App.get_running_app().selected_category = instance.category_name
-        self.manager.transition = SlideTransition(direction="up")
-        self.manager.current = "list"
+    def load_posts(self, label):
+        self.results_grid.clear_widgets()
+        self.results_grid.add_widget(loading_label())
+        fetch_posts(self.show_posts, on_error=self.show_error, label=label, max_results=20)
+
+    def show_posts(self, posts):
+        self.results_grid.clear_widgets()
+        if not posts:
+            self.results_grid.add_widget(Label(
+                text="No hay recetas en esta categoría todavía.",
+                color=COLOR_TEXT, size_hint_y=None, height=dp(40),
+            ))
+        for post in posts:
+            self.results_grid.add_widget(make_recipe_card(post, self.open_detail))
+
+    def show_error(self, err):
+        self.results_grid.clear_widgets()
+        self.results_grid.add_widget(error_label())
+
+    def open_detail(self, post):
+        detail_screen = self.manager.get_screen("detail")
+        detail_screen.show_post(post)
+        self.manager.transition = SlideTransition(direction="left")
+        self.manager.current = "detail"
 
     def go_back(self, instance):
         self.manager.transition = SlideTransition(direction="right")
-        self.manager.current = "list"
+        self.manager.current = "home"
 
+
+# ---------------------------------------------------------------------------
+# Detalle de receta: contenido real del post
+# ---------------------------------------------------------------------------
 
 class RecipeDetailScreen(Screen):
-    def load_recipe(self, index, recipe_list=None):
-        recipes = recipe_list if recipe_list is not None else load_recipes()
-        recipe = recipes[index]
-
+    def show_post(self, post):
+        self.current_post = post
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        header = BoxLayout(size_hint_y=None, height=dp(56), padding=dp(10))
-        with header.canvas.before:
-            Color(*COLOR_PRIMARY)
-            rect = RoundedRectangle(pos=header.pos, size=header.size, radius=[0])
-        header.bind(pos=lambda i, v: setattr(rect, "pos", v))
-        header.bind(size=lambda i, v: setattr(rect, "size", v))
-
-        back_btn = flat_button("< Volver", COLOR_PRIMARY_DARK, height=dp(40), font_size="14sp")
-        back_btn.size_hint_x = None
-        back_btn.width = dp(100)
-        back_btn.bind(on_press=self.go_back)
-        header.add_widget(back_btn)
-        header.add_widget(Label())
-        root.add_widget(header)
+        root.add_widget(make_header(show_back=True, on_back=self.go_back))
 
         scroll = ScrollView()
-        content = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(16), padding=dp(18))
+        content = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(14), padding=dp(18))
         content.bind(minimum_height=content.setter("height"))
 
-        content.add_widget(autosize_label(
-            recipe.get("titulo", ""), font_size="23sp", bold=True, color=COLOR_PRIMARY_DARK
-        ))
-        if recipe.get("categoria"):
-            content.add_widget(autosize_label(
-                "🏷️ " + recipe.get("categoria"), font_size="14sp", color=COLOR_ACCENT, bold=True
+        if post.get("imagen"):
+            content.add_widget(AsyncImage(
+                source=post["imagen"], size_hint=(1, None), height=dp(220),
+                allow_stretch=True, keep_ratio=True,
             ))
+
         content.add_widget(autosize_label(
-            "[b]🧂 Ingredientes[/b]\n" + recipe.get("ingredientes", ""), markup=True, font_size="16sp",
+            post.get("titulo", ""), font_size="22sp", bold=True, color=COLOR_PRIMARY_DARK,
         ))
+
+        if post.get("categorias"):
+            content.add_widget(autosize_label(
+                "🏷️ " + " · ".join(post["categorias"]), font_size="13sp", color=COLOR_ACCENT, bold=True,
+            ))
+
         content.add_widget(autosize_label(
-            "[b]👩‍🍳 Preparación[/b]\n" + recipe.get("pasos", ""), markup=True, font_size="16sp",
+            post.get("contenido_texto", "") or "Contenido no disponible.",
+            font_size="15sp",
         ))
+
+        if post.get("link"):
+            web_btn = flat_button("Ver receta completa en la web", COLOR_ACCENT, height=dp(48))
+            web_btn.bind(on_press=lambda i: webbrowser.open(post["link"]))
+            content.add_widget(web_btn)
 
         scroll.add_widget(content)
         root.add_widget(scroll)
@@ -299,147 +355,22 @@ class RecipeDetailScreen(Screen):
 
     def go_back(self, instance):
         self.manager.transition = SlideTransition(direction="right")
-        self.manager.current = "list"
+        self.manager.current = self.manager.previous_screen or "home"
 
 
-class LoginScreen(Screen):
-    def on_pre_enter(self, *args):
-        self.build_ui()
-
-    def build_ui(self):
-        self.clear_widgets()
-        root = BoxLayout(orientation="vertical", padding=dp(28), spacing=dp(16))
-        root.add_widget(Label(
-            text="🔐 Acceso de administrador", font_size="21sp", bold=True, color=COLOR_PRIMARY_DARK,
-            size_hint_y=None, height=dp(44),
-        ))
-
-        self.username_input = TextInput(
-            hint_text="Usuario", multiline=False, size_hint_y=None, height=dp(50),
-            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(14)],
-        )
-        self.password_input = TextInput(
-            hint_text="Contraseña", password=True, multiline=False, size_hint_y=None, height=dp(50),
-            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(14)],
-        )
-
-        root.add_widget(self.username_input)
-        root.add_widget(self.password_input)
-
-        login_btn = flat_button("Iniciar sesión", COLOR_ACCENT, height=dp(52))
-        login_btn.bind(on_press=self.try_login)
-        root.add_widget(login_btn)
-
-        cancel_btn = flat_button("Cancelar", COLOR_DANGER, height=dp(46))
-        cancel_btn.bind(on_press=self.cancel)
-        root.add_widget(cancel_btn)
-        root.add_widget(Label())
-        self.add_widget(root)
-
-    def try_login(self, instance):
-        user = self.username_input.text.strip()
-        pwd = self.password_input.text
-        if user == ADMIN_USERNAME and pwd == ADMIN_PASSWORD:
-            self.manager.transition = SlideTransition(direction="left")
-            self.manager.current = "add_recipe"
-        else:
-            Popup(title="Error", content=Label(text="Usuario o contraseña incorrectos."),
-                  size_hint=(0.8, 0.3)).open()
-
-    def cancel(self, instance):
-        self.manager.transition = SlideTransition(direction="down")
-        self.manager.current = "list"
-
-
-class AddRecipeScreen(Screen):
-    def on_pre_enter(self, *args):
-        self.build_ui()
-
-    def build_ui(self):
-        self.clear_widgets()
-        scroll = ScrollView()
-        root = BoxLayout(orientation="vertical", padding=dp(20), spacing=dp(12), size_hint_y=None)
-        root.bind(minimum_height=root.setter("height"))
-
-        root.add_widget(Label(
-            text="📝 Nueva receta", font_size="21sp", bold=True, color=COLOR_PRIMARY_DARK,
-            size_hint_y=None, height=dp(44),
-        ))
-
-        self.title_input = TextInput(
-            hint_text="Título", multiline=False, size_hint_y=None, height=dp(50),
-            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(14)],
-        )
-        self.category_spinner = Spinner(
-            text=CATEGORIES[0], values=CATEGORIES, size_hint_y=None, height=dp(50),
-            background_color=COLOR_CARD, color=COLOR_TEXT,
-        )
-        self.ingredients_input = TextInput(
-            hint_text="Ingredientes", multiline=True, size_hint_y=None, height=dp(120),
-            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(10)],
-        )
-        self.steps_input = TextInput(
-            hint_text="Preparación", multiline=True, size_hint_y=None, height=dp(160),
-            background_color=COLOR_CARD, foreground_color=COLOR_TEXT, padding=[dp(12), dp(10)],
-        )
-
-        root.add_widget(self.title_input)
-        root.add_widget(Label(text="Categoría:", size_hint_y=None, height=dp(24), color=COLOR_TEXT))
-        root.add_widget(self.category_spinner)
-        root.add_widget(self.ingredients_input)
-        root.add_widget(self.steps_input)
-
-        save_btn = flat_button("Guardar receta", COLOR_ACCENT, height=dp(52))
-        save_btn.bind(on_press=self.save_recipe)
-        root.add_widget(save_btn)
-
-        back_btn = flat_button("Volver al panel", COLOR_PRIMARY_DARK, height=dp(46))
-        back_btn.bind(on_press=self.go_back)
-        root.add_widget(back_btn)
-
-        scroll.add_widget(root)
-        self.add_widget(scroll)
-
-    def save_recipe(self, instance):
-        title = self.title_input.text.strip()
-        if not title:
-            Popup(title="Falta información", content=Label(text="Por favor, añade un título."),
-                  size_hint=(0.8, 0.3)).open()
-            return
-
-        recipes = load_recipes()
-        recipes.append({
-            "titulo": title,
-            "categoria": self.category_spinner.text,
-            "ingredientes": self.ingredients_input.text.strip(),
-            "pasos": self.steps_input.text.strip(),
-        })
-        save_recipes(recipes)
-
-        self.title_input.text = ""
-        self.ingredients_input.text = ""
-        self.steps_input.text = ""
-
-        Popup(title="Guardado", content=Label(text="¡Receta publicada con éxito!"),
-              size_hint=(0.8, 0.3)).open()
-
-    def go_back(self, instance):
-        self.manager.transition = SlideTransition(direction="right")
-        self.manager.current = "list"
-
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
 
 class KocinaApp(App):
-    selected_category = None
-
     def build(self):
         self.title = "Kocina del Mundo"
         sm = ScreenManager()
-        sm.add_widget(RecipeListScreen(name="list"))
-        sm.add_widget(CategoriesScreen(name="categories"))
+        sm.previous_screen = "home"
+        sm.add_widget(HomeScreen(name="home"))
+        sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
-        sm.add_widget(LoginScreen(name="login"))
-        sm.add_widget(AddRecipeScreen(name="add_recipe"))
-        sm.current = "list"
+        sm.current = "home"
         return sm
 
 
