@@ -1,43 +1,25 @@
 """
-Manejo del logo de la app (cargado desde logo_data.py en base64).
+logo.py
+Carga el logo desde base64 si está disponible; si no, main.py usa un
+texto de respaldo automáticamente.
 """
 
 import base64
-import io
+from io import BytesIO
 
 from kivy.core.image import Image as CoreImage
+from kivy.uix.image import Image as LogoImage
 from kivy.metrics import dp
-from kivy.graphics import Color, Rectangle
-from kivy.uix.widget import Widget
 
+from logo_data import LOGO_BASE64
 
-def _load_logo_texture():
-    try:
-        from logo_data import HEADER_LOGO_BASE64
-        raw = base64.b64decode(HEADER_LOGO_BASE64)
-        buf = io.BytesIO(raw)
-        core_img = CoreImage(buf, ext="png")
-        return core_img.texture
-    except Exception:
-        return None
-
-
-LOGO_TEXTURE = _load_logo_texture()
+LOGO_TEXTURE = None
+LOGO_WIDTH = dp(140)
 LOGO_HEIGHT = dp(44)
-LOGO_WIDTH = dp(66)
-if LOGO_TEXTURE:
-    ratio = LOGO_TEXTURE.width / LOGO_TEXTURE.height
-    LOGO_WIDTH = LOGO_HEIGHT * ratio
 
-
-class LogoImage(Widget):
-    def __init__(self, texture, **kwargs):
-        super().__init__(**kwargs)
-        with self.canvas:
-            Color(1, 1, 1, 1)
-            self.rect = Rectangle(texture=texture, pos=self.pos, size=self.size)
-        self.bind(pos=self._update, size=self._update)
-
-    def _update(self, *args):
-        self.rect.pos = self.pos
-        self.rect.size = self.size
+if LOGO_BASE64:
+    try:
+        image_data = base64.b64decode(LOGO_BASE64)
+        LOGO_TEXTURE = CoreImage(BytesIO(image_data), ext="png").texture
+    except Exception:
+        LOGO_TEXTURE = None
