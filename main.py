@@ -9,7 +9,6 @@ import webbrowser
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
-from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -221,7 +220,7 @@ class HomeScreen(Screen):
 
     def open_detail(self, post):
         detail_screen = self.manager.get_screen("detail")
-        detail_screen.show_post(post)
+        detail_screen.show_post(post, return_to="home")
         self.manager.transition = SlideTransition(direction="left")
         self.manager.current = "detail"
 
@@ -300,7 +299,7 @@ class CategoryScreen(Screen):
 
     def open_detail(self, post):
         detail_screen = self.manager.get_screen("detail")
-        detail_screen.show_post(post)
+        detail_screen.show_post(post, return_to="category")
         self.manager.transition = SlideTransition(direction="left")
         self.manager.current = "detail"
 
@@ -314,8 +313,11 @@ class CategoryScreen(Screen):
 # ---------------------------------------------------------------------------
 
 class RecipeDetailScreen(Screen):
-    def show_post(self, post):
+    return_to = "home"
+
+    def show_post(self, post, return_to="home"):
         self.current_post = post
+        self.return_to = return_to
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
         root.add_widget(make_header(show_back=True, on_back=self.go_back))
@@ -355,7 +357,7 @@ class RecipeDetailScreen(Screen):
 
     def go_back(self, instance):
         self.manager.transition = SlideTransition(direction="right")
-        self.manager.current = self.manager.previous_screen or "home"
+        self.manager.current = self.return_to
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +368,6 @@ class KocinaApp(App):
     def build(self):
         self.title = "Kocina del Mundo"
         sm = ScreenManager()
-        sm.previous_screen = "home"
         sm.add_widget(HomeScreen(name="home"))
         sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
