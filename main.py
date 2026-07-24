@@ -1,6 +1,6 @@
 """
 Kocina del Mundo
-App nativa que refleja la estructura real del sitio
+App nativa que refleja fielmente la estructura de
 https://kocinadelmundo24.blogspot.com (recetas cargadas en vivo desde Blogger).
 """
 
@@ -17,6 +17,7 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.image import AsyncImage
+from kivy.uix.carousel import Carousel
 from kivy.graphics import Color, RoundedRectangle
 
 from constants import (
@@ -32,7 +33,7 @@ from blogger_api import fetch_posts
 
 
 # ---------------------------------------------------------------------------
-# Helpers de UI (mismo estilo que antes)
+# Helpers de UI
 # ---------------------------------------------------------------------------
 
 def flat_button(text, bg_color, text_color=COLOR_WHITE, height=dp(50), font_size="16sp", bold=True):
@@ -54,17 +55,21 @@ def autosize_label(text, markup=False, font_size="15sp", color=COLOR_TEXT, bold=
     return lbl
 
 
-class RecipeCard(BoxLayout):
-    def __init__(self, **kwargs):
+class Card(BoxLayout):
+    def __init__(self, bg=COLOR_CARD, **kwargs):
         super().__init__(**kwargs)
         with self.canvas.before:
-            Color(*COLOR_CARD)
+            Color(*bg)
             self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(12)])
         self.bind(pos=self._update_rect, size=self._update_rect)
 
     def _update_rect(self, *args):
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
+
+
+def section_title(text):
+    return autosize_label(text, font_size="19sp", bold=True, color=COLOR_PRIMARY_DARK, width_padding=dp(28))
 
 
 def make_header(show_back=False, on_back=None):
@@ -93,9 +98,9 @@ def make_header(show_back=False, on_back=None):
 
 
 def make_recipe_card(post, on_press):
-    """Tarjeta de receta con miniatura, título y fecha (igual que la web)."""
-    card = RecipeCard(orientation="horizontal", size_hint_y=None, height=dp(96),
-                       padding=dp(8), spacing=dp(10))
+    """Tarjeta compacta de receta: miniatura + título + categorías."""
+    card = Card(orientation="horizontal", size_hint_y=None, height=dp(96),
+                padding=dp(8), spacing=dp(10))
 
     if post.get("imagen"):
         thumb = AsyncImage(source=post["imagen"], size_hint=(None, None),
@@ -120,6 +125,32 @@ def make_recipe_card(post, on_press):
     return card
 
 
+def make_featured_slide(post, on_press):
+    """Diapositiva grande del carrusel destacado (igual que la portada web)."""
+    slide = BoxLayout(orientation="vertical", padding=dp(4), spacing=dp(6))
+
+    if post.get("imagen"):
+        img = AsyncImage(source=post["imagen"], size_hint=(1, 1), allow_stretch=True, keep_ratio=True)
+    else:
+        img = BoxLayout(size_hint=(1, 1))
+    slide.add_widget(img)
+
+    caption = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(90),
+                         padding=(dp(12), dp(6)), spacing=dp(4))
+    if post.get("fecha_es"):
+        caption.add_widget(autosize_label(post["fecha_es"], font_size="12sp",
+                                           color=COLOR_ACCENT, width_padding=dp(40)))
+    caption.add_widget(autosize_label(post.get("titulo", ""), font_size="16sp", bold=True,
+                                       color=COLOR_TEXT, width_padding=dp(40)))
+    ver_btn = flat_button("Ver receta", COLOR_ACCENT, height=dp(36), font_size="12sp")
+    ver_btn.size_hint_y = None
+    ver_btn.bind(on_press=lambda i: on_press(post))
+    caption.add_widget(ver_btn)
+    slide.add_widget(caption)
+
+    return slide
+
+
 def loading_label(text="Cargando recetas..."):
     return Label(text=text, color=COLOR_TEXT, size_hint_y=None, height=dp(60), font_size="15sp")
 
@@ -128,8 +159,36 @@ def error_label(text="No se pudieron cargar las recetas. Revisa tu conexión."):
     return Label(text=text, color=COLOR_DANGER, size_hint_y=None, height=dp(60), font_size="14sp")
 
 
+def make_about_section():
+    box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=(0, dp(10)))
+    box.bind(minimum_height=box.setter("height"))
+    box.add_widget(section_title("Sobre Kocina del Mundo"))
+    box.add_widget(autosize_label(
+        "Bienvenido a Kocina del Mundo, un rincón digital para viajar a través "
+        "del sabor: recetas caseras, técnicas tradicionales e historias de "
+        "cocinas de todo el planeta, explicadas paso a paso.",
+        font_size="14sp", width_padding=dp(28),
+    ))
+    return box
+
+
+def make_footer():
+    box = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(90),
+                     padding=(dp(20), dp(14)), spacing=dp(6))
+    with box.canvas.before:
+        Color(*COLOR_PRIMARY_DARK)
+        rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[0])
+        box.bind(pos=lambda i, v: setattr(rect, "pos", v))
+        box.bind(size=lambda i, v: setattr(rect, "size", v))
+    box.add_widget(Label(text="Kocina del Mundo", bold=True, color=COLOR_WHITE, font_size="14sp",
+                          size_hint_y=None, height=dp(24)))
+    box.add_widget(Label(text="© Kocina del Mundo · Buen provecho", color=(1, 1, 1, 0.8),
+                          font_size="11sp", size_hint_y=None, height=dp(20)))
+    return box
+
+
 # ---------------------------------------------------------------------------
-# Home: refleja la portada del sitio (destacadas + categorías + rejilla)
+# Home: portada con carrusel destacado, categorías, recetas y footer
 # ---------------------------------------------------------------------------
 
 class HomeScreen(Screen):
@@ -142,7 +201,6 @@ class HomeScreen(Screen):
         root = BoxLayout(orientation="vertical")
         root.add_widget(make_header())
 
-        # Barra de búsqueda
         search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
         self.search_input = TextInput(
             hint_text="Buscar recetas...", multiline=False,
@@ -158,7 +216,6 @@ class HomeScreen(Screen):
         search_bar.add_widget(search_btn)
         root.add_widget(search_bar)
 
-        # Categorías principales (igual que el menú de la web)
         cat_scroll = ScrollView(size_hint_y=None, height=dp(56), do_scroll_y=False, do_scroll_x=True)
         cat_row = BoxLayout(size_hint_x=None, spacing=dp(8), padding=(dp(10), dp(6)))
         cat_row.bind(minimum_width=cat_row.setter("width"))
@@ -172,38 +229,55 @@ class HomeScreen(Screen):
         cat_scroll.add_widget(cat_row)
         root.add_widget(cat_scroll)
 
-        # Contenedor de resultados (se llena al cargar)
-        self.results_scroll = ScrollView()
-        self.results_grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(10), padding=dp(14))
-        self.results_grid.bind(minimum_height=self.results_grid.setter("height"))
-        self.results_grid.add_widget(loading_label())
-        self.results_scroll.add_widget(self.results_grid)
-        root.add_widget(self.results_scroll)
+        self.body_scroll = ScrollView()
+        self.body = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
+        self.body.bind(minimum_height=self.body.setter("height"))
+        self.body.add_widget(loading_label())
+        self.body_scroll.add_widget(self.body)
+        root.add_widget(self.body_scroll)
 
         self.add_widget(root)
 
     def load_posts(self, query=None):
-        self.results_grid.clear_widgets()
-        self.results_grid.add_widget(loading_label())
+        self.body.clear_widgets()
+        self.body.add_widget(loading_label())
         fetch_posts(self.show_posts, on_error=self.show_error, query=query, max_results=20)
 
     def show_posts(self, posts):
-        self.results_grid.clear_widgets()
-        self.results_grid.add_widget(autosize_label(
-            "Últimas recetas" if not posts else f"Últimas recetas ({len(posts)})",
-            font_size="17sp", bold=True, color=COLOR_PRIMARY_DARK,
+        self.body.clear_widgets()
+
+        # Carrusel destacado (como la portada de la web)
+        if posts:
+            carousel = Carousel(direction="right", size_hint_y=None, height=dp(320))
+            for post in posts[:5]:
+                carousel.add_widget(make_featured_slide(post, self.open_detail))
+            self.body.add_widget(carousel)
+
+        results_wrap = BoxLayout(orientation="vertical", size_hint_y=None,
+                                  spacing=dp(10), padding=dp(14))
+        results_wrap.bind(minimum_height=results_wrap.setter("height"))
+        results_wrap.add_widget(section_title(
+            "Últimas recetas" if not posts else f"Últimas recetas ({len(posts)})"
         ))
         if not posts:
-            self.results_grid.add_widget(Label(
+            results_wrap.add_widget(Label(
                 text="No se encontraron recetas.", color=COLOR_TEXT,
                 size_hint_y=None, height=dp(40),
             ))
         for post in posts:
-            self.results_grid.add_widget(make_recipe_card(post, self.open_detail))
+            results_wrap.add_widget(make_recipe_card(post, self.open_detail))
+        self.body.add_widget(results_wrap)
+
+        about_wrap = BoxLayout(orientation="vertical", size_hint_y=None, padding=(dp(14), 0))
+        about_wrap.bind(minimum_height=about_wrap.setter("height"))
+        about_wrap.add_widget(make_about_section())
+        self.body.add_widget(about_wrap)
+
+        self.body.add_widget(make_footer())
 
     def show_error(self, err):
-        self.results_grid.clear_widgets()
-        self.results_grid.add_widget(error_label())
+        self.body.clear_widgets()
+        self.body.add_widget(error_label())
 
     def do_search(self, instance):
         query = self.search_input.text.strip()
@@ -226,7 +300,7 @@ class HomeScreen(Screen):
 
 
 # ---------------------------------------------------------------------------
-# Categoría: muestra subcategorías reales + recetas filtradas
+# Categoría: subcategorías reales + recetas filtradas
 # ---------------------------------------------------------------------------
 
 class CategoryScreen(Screen):
@@ -247,7 +321,6 @@ class CategoryScreen(Screen):
             color=COLOR_PRIMARY_DARK, width_padding=dp(24),
         ))
 
-        # Subcategorías reales como chips
         subcats = CATEGORIES.get(self.current_category, [])
         chip_scroll = ScrollView(size_hint_y=None, height=dp(50), do_scroll_y=False, do_scroll_x=True)
         chip_row = BoxLayout(size_hint_x=None, spacing=dp(6), padding=(dp(10), dp(4)))
@@ -309,7 +382,7 @@ class CategoryScreen(Screen):
 
 
 # ---------------------------------------------------------------------------
-# Detalle de receta: contenido real del post
+# Detalle de receta
 # ---------------------------------------------------------------------------
 
 class RecipeDetailScreen(Screen):
@@ -336,9 +409,12 @@ class RecipeDetailScreen(Screen):
             post.get("titulo", ""), font_size="22sp", bold=True, color=COLOR_PRIMARY_DARK,
         ))
 
+        if post.get("fecha_es"):
+            content.add_widget(autosize_label(post["fecha_es"], font_size="12sp", color=COLOR_ACCENT))
+
         if post.get("categorias"):
             content.add_widget(autosize_label(
-                "🏷️ " + " · ".join(post["categorias"]), font_size="13sp", color=COLOR_ACCENT, bold=True,
+                " · ".join(post["categorias"]), font_size="13sp", color=COLOR_ACCENT, bold=True,
             ))
 
         content.add_widget(autosize_label(
