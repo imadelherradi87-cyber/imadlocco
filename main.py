@@ -110,12 +110,22 @@ def make_recipe_card(post, on_press):
     card.add_widget(thumb)
 
     info = BoxLayout(orientation="vertical", spacing=dp(4))
-    title_lbl = autosize_label(post.get("titulo", ""), font_size="16sp", bold=True,
-                                color=COLOR_TEXT, width_padding=dp(120))
+
+    title_lbl = Label(
+        text=post.get("titulo", ""), font_size="15sp", bold=True, color=COLOR_TEXT,
+        halign="left", valign="top", shorten=True, shorten_from="right",
+        size_hint_y=1,
+    )
+    title_lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
     info.add_widget(title_lbl)
+
     if post.get("categorias"):
-        cat_lbl = autosize_label(" · ".join(post["categorias"][:3]), font_size="12sp",
-                                  color=COLOR_ACCENT, width_padding=dp(120))
+        cat_lbl = Label(
+            text=" · ".join(post["categorias"][:2]), font_size="12sp", color=COLOR_ACCENT,
+            halign="left", valign="bottom", shorten=True,
+            size_hint_y=None, height=dp(20),
+        )
+        cat_lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
         info.add_widget(cat_lbl)
     card.add_widget(info)
 
