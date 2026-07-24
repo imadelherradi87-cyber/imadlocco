@@ -85,11 +85,11 @@ def _parse_entry(entry):
 
     labels = [c.get("term") for c in entry.get("category", []) if c.get("term")]
 
-    image_url = None
-    if "media$thumbnail" in entry:
-        image_url = entry["media$thumbnail"].get("url", "").replace("/s72-c/", "/s600/")
-    if not image_url:
-        image_url = _extract_first_image(content_html)
+    image_url = _extract_first_image(content_html)
+    if not image_url and "media$thumbnail" in entry:
+        # Como último recurso, usa la miniatura pero pide un tamaño más grande
+        thumb_url = entry["media$thumbnail"].get("url", "")
+        image_url = re.sub(r"/s\d+(-c)?/", "/s600/", thumb_url) if thumb_url else None
 
     published = entry.get("published", {}).get("$t", "")
 
