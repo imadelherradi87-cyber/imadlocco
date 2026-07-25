@@ -16,7 +16,8 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
-from kivy.uix.image import AsyncImage
+from kivy.uix.image import AsyncImage, Image
+from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.carousel import Carousel
 from kivy.graphics import Color, RoundedRectangle
 
@@ -29,6 +30,7 @@ from constants import (
 Window.clearcolor = COLOR_BG
 
 from logo import LOGO_TEXTURE, LOGO_HEIGHT, LOGO_WIDTH, LogoImage
+from icons import get_icon_texture
 from blogger_api import fetch_posts
 
 
@@ -161,6 +163,42 @@ def make_featured_slide(post, on_press):
     return slide
 
 
+def make_tagline_bar():
+    bar = BoxLayout(size_hint_y=None, height=dp(26))
+    with bar.canvas.before:
+        Color(*COLOR_PRIMARY_DARK)
+        rect = RoundedRectangle(pos=bar.pos, size=bar.size, radius=[0])
+        bar.bind(pos=lambda i, v: setattr(rect, "pos", v))
+        bar.bind(size=lambda i, v: setattr(rect, "size", v))
+    bar.add_widget(Label(
+        text="Nuevas recetas cada hora, para ti y tu familia",
+        font_size="11sp", color=(1, 1, 1, 0.9), italic=True,
+    ))
+    return bar
+
+
+class CategoryButton(ButtonBehavior, BoxLayout):
+    """Botón de categoría con icono + texto, igual que el menú del sitio."""
+
+    def __init__(self, text, icon_texture=None, **kwargs):
+        super().__init__(orientation="vertical", padding=(dp(6), dp(6)), spacing=dp(2), **kwargs)
+        with self.canvas.before:
+            Color(*COLOR_PRIMARY_DARK)
+            self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(8)])
+        self.bind(pos=self._update_rect, size=self._update_rect)
+
+        if icon_texture:
+            icon = Image(texture=icon_texture, size_hint=(None, None),
+                         size=(dp(26), dp(26)), pos_hint={"center_x": 0.5})
+            self.add_widget(icon)
+
+        self.add_widget(Label(text=text, font_size="12sp", bold=True, color=COLOR_WHITE))
+
+    def _update_rect(self, *args):
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
+
+
 def loading_label(text="Cargando recetas..."):
     return Label(text=text, color=COLOR_TEXT, size_hint_y=None, height=dp(60), font_size="15sp")
 
@@ -209,6 +247,7 @@ class HomeScreen(Screen):
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
+        root.add_widget(make_tagline_bar())
         root.add_widget(make_header())
 
         search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
@@ -226,15 +265,13 @@ class HomeScreen(Screen):
         search_bar.add_widget(search_btn)
         root.add_widget(search_bar)
 
-        cat_scroll = ScrollView(size_hint_y=None, height=dp(56), do_scroll_y=False, do_scroll_x=True)
+        cat_scroll = ScrollView(size_hint_y=None, height=dp(76), do_scroll_y=False, do_scroll_x=True)
         cat_row = BoxLayout(size_hint_x=None, spacing=dp(8), padding=(dp(10), dp(6)))
         cat_row.bind(minimum_width=cat_row.setter("width"))
         for cat_name in CATEGORIES.keys():
-            btn = flat_button(cat_name, COLOR_PRIMARY_DARK, height=dp(44), font_size="13sp")
-            btn.size_hint_x = None
-            btn.width = dp(120)
-            btn.category_name = cat_name
-            btn.bind(on_press=self.open_category)
+            btn = CategoryButton(cat_name, icon_texture=get_icon_texture(cat_name),
+                                  size_hint=(None, None), width=dp(90), height=dp(64))
+            btn.bind(on_press=lambda inst, name=cat_name: self.open_category_by_name(name))
             cat_row.add_widget(btn)
         cat_scroll.add_widget(cat_row)
         root.add_widget(cat_scroll)
@@ -296,6 +333,12 @@ class HomeScreen(Screen):
         else:
             self.load_posts()
 
+    def open_category_by_name(self, category_name):
+        cat_screen = self.manager.get_screen("category")
+        cat_screen.set_category(category_name)
+        self.manager.transition = SlideTransition(direction="left")
+        self.manager.current = "category"
+
     def open_category(self, instance):
         cat_screen = self.manager.get_screen("category")
         cat_screen.set_category(instance.category_name)
@@ -326,10 +369,15 @@ class CategoryScreen(Screen):
         root = BoxLayout(orientation="vertical")
         root.add_widget(make_header(show_back=True, on_back=self.go_back))
 
-        root.add_widget(autosize_label(
+        title_row = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(20), 0), spacing=dp(8))
+        icon_tex = get_icon_texture(self.current_category)
+        if icon_tex:
+            title_row.add_widget(Image(texture=icon_tex, size_hint=(None, None), size=(dp(28), dp(28))))
+        title_row.add_widget(autosize_label(
             self.current_category or "", font_size="20sp", bold=True,
-            color=COLOR_PRIMARY_DARK, width_padding=dp(24),
+            color=COLOR_PRIMARY_DARK, width_padding=dp(60),
         ))
+        root.add_widget(title_row)
 
         subcats = CATEGORIES.get(self.current_category, [])
         chip_scroll = ScrollView(size_hint_y=None, height=dp(50), do_scroll_y=False, do_scroll_x=True)
