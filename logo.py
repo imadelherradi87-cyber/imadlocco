@@ -1,7 +1,7 @@
 """
 logo.py
-Carga el logo desde base64 si está disponible; si no, main.py usa un
-texto de respaldo automáticamente.
+Carga el logo real desde base64. Si por algún motivo falla,
+main.py usa un texto de respaldo automáticamente.
 """
 
 import base64
@@ -14,8 +14,8 @@ from kivy.metrics import dp
 from logo_data import LOGO_BASE64
 
 LOGO_TEXTURE = None
-LOGO_WIDTH = dp(140)
-LOGO_HEIGHT = dp(44)
+LOGO_WIDTH = dp(150)
+LOGO_HEIGHT = dp(58)
 
 if LOGO_BASE64:
     try:
