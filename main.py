@@ -9,6 +9,7 @@ import webbrowser
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
+from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -75,27 +76,30 @@ def section_title(text):
 
 
 def make_header(show_back=False, on_back=None):
-    header = BoxLayout(size_hint_y=None, height=dp(64), padding=dp(10), spacing=dp(8))
+    header = BoxLayout(size_hint_y=None, height=dp(150), padding=dp(8))
     with header.canvas.before:
-        Color(*COLOR_PRIMARY)
+        Color(1, 1, 1, 1)
         rect = RoundedRectangle(pos=header.pos, size=header.size, radius=[0])
         header.bind(pos=lambda i, v: setattr(rect, "pos", v))
         header.bind(size=lambda i, v: setattr(rect, "size", v))
 
     if show_back:
-        back_btn = flat_button("< Volver", COLOR_PRIMARY_DARK, height=dp(40), font_size="13sp")
-        back_btn.size_hint_x = None
-        back_btn.width = dp(90)
+        back_btn = flat_button("< Volver", COLOR_PRIMARY_DARK, height=dp(36), font_size="12sp")
+        back_btn.size_hint = (None, None)
+        back_btn.width = dp(84)
         if on_back:
             back_btn.bind(on_press=on_back)
         header.add_widget(back_btn)
 
+    from kivy.uix.anchorlayout import AnchorLayout
+    logo_anchor = AnchorLayout(anchor_x="center", anchor_y="center")
     if LOGO_TEXTURE:
         logo = LogoImage(texture=LOGO_TEXTURE, size_hint=(None, None),
                           width=LOGO_WIDTH, height=LOGO_HEIGHT)
     else:
-        logo = Label(text="Kocina del Mundo", font_size="18sp", bold=True, color=COLOR_WHITE)
-    header.add_widget(logo)
+        logo = Label(text="Kocina del Mundo", font_size="22sp", bold=True, color=COLOR_PRIMARY)
+    logo_anchor.add_widget(logo)
+    header.add_widget(logo_anchor)
     return header
 
 
@@ -164,39 +168,66 @@ def make_featured_slide(post, on_press):
 
 
 def make_tagline_bar():
-    bar = BoxLayout(size_hint_y=None, height=dp(26))
+    bar = BoxLayout(size_hint_y=None, height=dp(30))
     with bar.canvas.before:
-        Color(*COLOR_PRIMARY_DARK)
+        Color(0, 0, 0, 1)
         rect = RoundedRectangle(pos=bar.pos, size=bar.size, radius=[0])
         bar.bind(pos=lambda i, v: setattr(rect, "pos", v))
         bar.bind(size=lambda i, v: setattr(rect, "size", v))
     bar.add_widget(Label(
-        text="Nuevas recetas cada hora, para ti y tu familia",
-        font_size="11sp", color=(1, 1, 1, 0.9), italic=True,
+        text="NUEVAS RECETAS CADA HORA, PARA TI Y TU FAMILIA",
+        font_size="11sp", color=COLOR_WHITE, bold=True,
     ))
     return bar
 
 
 class CategoryButton(ButtonBehavior, BoxLayout):
-    """Botón de categoría con icono + texto, igual que el menú del sitio."""
+    """Botón circular de categoría con icono + texto pequeño, como el menú del sitio."""
 
     def __init__(self, text, icon_texture=None, **kwargs):
-        super().__init__(orientation="vertical", padding=(dp(6), dp(6)), spacing=dp(2), **kwargs)
+        super().__init__(orientation="vertical", spacing=dp(2), **kwargs)
+        from kivy.graphics import Ellipse
         with self.canvas.before:
             Color(*COLOR_PRIMARY_DARK)
-            self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(8)])
-        self.bind(pos=self._update_rect, size=self._update_rect)
+            self.bg_circle = Ellipse(pos=self.pos, size=(0, 0))
+        self.bind(pos=self._update_circle, size=self._update_circle)
 
+        circle_wrap = BoxLayout(size_hint_y=None, height=dp(44))
         if icon_texture:
             icon = Image(texture=icon_texture, size_hint=(None, None),
-                         size=(dp(26), dp(26)), pos_hint={"center_x": 0.5})
-            self.add_widget(icon)
+                         size=(dp(22), dp(22)), pos_hint={"center_x": 0.5, "center_y": 0.5})
+            circle_wrap.add_widget(icon)
+        self.add_widget(circle_wrap)
 
-        self.add_widget(Label(text=text, font_size="12sp", bold=True, color=COLOR_WHITE))
+        self.add_widget(Label(text=text, font_size="9sp", bold=True, color=COLOR_TEXT,
+                               size_hint_y=None, height=dp(16), shorten=True))
 
-    def _update_rect(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
+    def _update_circle(self, *args):
+        diameter = dp(44)
+        cx = self.center_x
+        cy = self.pos[1] + self.height - dp(22)
+        self.bg_circle.pos = (cx - diameter / 2, cy - diameter / 2)
+        self.bg_circle.size = (diameter, diameter)
+
+
+class ClickableBox(ButtonBehavior, BoxLayout):
+    pass
+
+
+def make_category_banner_slide(cat_name, icon_texture, on_press):
+    """Diapositiva del banner rotativo que muestra cada categoría (reemplaza el buscador)."""
+    slide = ClickableBox(orientation="horizontal", padding=dp(14), spacing=dp(12))
+    with slide.canvas.before:
+        Color(*COLOR_PRIMARY)
+        rect = RoundedRectangle(pos=slide.pos, size=slide.size, radius=[0])
+        slide.bind(pos=lambda i, v: setattr(rect, "pos", v))
+        slide.bind(size=lambda i, v: setattr(rect, "size", v))
+    slide.bind(on_press=lambda i: on_press(cat_name))
+
+    if icon_texture:
+        slide.add_widget(Image(texture=icon_texture, size_hint=(None, None), size=(dp(40), dp(40))))
+    slide.add_widget(Label(text=cat_name, font_size="18sp", bold=True, color=COLOR_WHITE))
+    return slide
 
 
 def loading_label(text="Cargando recetas..."):
@@ -250,31 +281,22 @@ class HomeScreen(Screen):
         root.add_widget(make_tagline_bar())
         root.add_widget(make_header())
 
-        search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
-        self.search_input = TextInput(
-            hint_text="Buscar recetas...", multiline=False,
-            background_color=COLOR_CARD, foreground_color=COLOR_TEXT,
-            size_hint_x=1, padding=[dp(10), dp(10)],
-        )
-        self.search_input.bind(on_text_validate=self.do_search)
-        search_btn = flat_button("Buscar", COLOR_ACCENT, height=dp(44), font_size="13sp")
-        search_btn.size_hint_x = None
-        search_btn.width = dp(90)
-        search_btn.bind(on_press=self.do_search)
-        search_bar.add_widget(self.search_input)
-        search_bar.add_widget(search_btn)
-        root.add_widget(search_bar)
-
-        cat_scroll = ScrollView(size_hint_y=None, height=dp(76), do_scroll_y=False, do_scroll_x=True)
-        cat_row = BoxLayout(size_hint_x=None, spacing=dp(8), padding=(dp(10), dp(6)))
-        cat_row.bind(minimum_width=cat_row.setter("width"))
+        cat_row = BoxLayout(size_hint_y=None, height=dp(72), padding=(dp(6), dp(4)), spacing=dp(4))
         for cat_name in CATEGORIES.keys():
             btn = CategoryButton(cat_name, icon_texture=get_icon_texture(cat_name),
-                                  size_hint=(None, None), width=dp(90), height=dp(64))
+                                  size_hint_x=1)
             btn.bind(on_press=lambda inst, name=cat_name: self.open_category_by_name(name))
             cat_row.add_widget(btn)
-        cat_scroll.add_widget(cat_row)
-        root.add_widget(cat_scroll)
+        root.add_widget(cat_row)
+
+        # Banner rotativo de categorías (ocupa el lugar donde antes estaba la búsqueda)
+        self.category_banner = Carousel(direction="right", size_hint_y=None, height=dp(70))
+        for cat_name in CATEGORIES.keys():
+            self.category_banner.add_widget(make_category_banner_slide(
+                cat_name, get_icon_texture(cat_name), self.open_category_by_name,
+            ))
+        root.add_widget(self.category_banner)
+        Clock.schedule_interval(self._advance_banner, 3)
 
         self.body_scroll = ScrollView()
         self.body = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
@@ -284,6 +306,13 @@ class HomeScreen(Screen):
         root.add_widget(self.body_scroll)
 
         self.add_widget(root)
+
+    def _advance_banner(self, dt):
+        if not self.category_banner.slides:
+            return
+        idx = self.category_banner.index
+        nxt = (idx + 1) % len(self.category_banner.slides)
+        self.category_banner.load_slide(self.category_banner.slides[nxt])
 
     def load_posts(self, query=None):
         self.body.clear_widgets()
@@ -299,6 +328,22 @@ class HomeScreen(Screen):
             for post in posts[:5]:
                 carousel.add_widget(make_featured_slide(post, self.open_detail))
             self.body.add_widget(carousel)
+
+        # Búsqueda (colocada debajo de la primera receta destacada)
+        search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
+        self.search_input = TextInput(
+            hint_text="Buscar recetas...", multiline=False,
+            background_color=COLOR_CARD, foreground_color=COLOR_TEXT,
+            size_hint_x=1, padding=[dp(10), dp(10)],
+        )
+        self.search_input.bind(on_text_validate=self.do_search)
+        search_btn = flat_button("Buscar", COLOR_ACCENT, height=dp(44), font_size="13sp")
+        search_btn.size_hint_x = None
+        search_btn.width = dp(90)
+        search_btn.bind(on_press=self.do_search)
+        search_bar.add_widget(self.search_input)
+        search_bar.add_widget(search_btn)
+        self.body.add_widget(search_bar)
 
         results_wrap = BoxLayout(orientation="vertical", size_hint_y=None,
                                   spacing=dp(10), padding=dp(14))
