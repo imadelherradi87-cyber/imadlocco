@@ -14,8 +14,8 @@ from kivy.metrics import dp
 from logo_data import LOGO_BASE64
 
 LOGO_TEXTURE = None
-LOGO_WIDTH = dp(210)
-LOGO_HEIGHT = dp(140)
+LOGO_WIDTH = dp(195)
+LOGO_HEIGHT = dp(130)
 
 if LOGO_BASE64:
     try:
