@@ -9,7 +9,6 @@ import webbrowser
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
-from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -76,7 +75,7 @@ def section_title(text):
 
 
 def make_header(show_back=False, on_back=None):
-    header = BoxLayout(size_hint_y=None, height=dp(150), padding=dp(8))
+    header = BoxLayout(size_hint_y=None, height=LOGO_HEIGHT + dp(6), padding=(dp(8), dp(1)))
     with header.canvas.before:
         Color(1, 1, 1, 1)
         rect = RoundedRectangle(pos=header.pos, size=header.size, radius=[0])
@@ -188,46 +187,34 @@ class CategoryButton(ButtonBehavior, BoxLayout):
         super().__init__(orientation="vertical", spacing=dp(2), **kwargs)
         from kivy.graphics import Ellipse
         with self.canvas.before:
-            Color(*COLOR_PRIMARY_DARK)
+            Color(0, 0, 0, 1)
             self.bg_circle = Ellipse(pos=self.pos, size=(0, 0))
         self.bind(pos=self._update_circle, size=self._update_circle)
 
-        circle_wrap = BoxLayout(size_hint_y=None, height=dp(44))
+        circle_wrap = BoxLayout(size_hint_y=None, height=dp(48))
         if icon_texture:
-            icon = Image(texture=icon_texture, size_hint=(None, None),
-                         size=(dp(22), dp(22)), pos_hint={"center_x": 0.5, "center_y": 0.5})
-            circle_wrap.add_widget(icon)
+            icon = Image(texture=icon_texture, size_hint=(None, None), size=(dp(32), dp(32)))
+            icon.pos_hint = {"center_x": 0.5, "center_y": 0.5}
+            icon_anchor = _center_anchor(icon)
+            circle_wrap.add_widget(icon_anchor)
         self.add_widget(circle_wrap)
 
-        self.add_widget(Label(text=text, font_size="9sp", bold=True, color=COLOR_TEXT,
+        self.add_widget(Label(text=text, font_size="10sp", bold=True, color=COLOR_TEXT,
                                size_hint_y=None, height=dp(16), shorten=True))
 
     def _update_circle(self, *args):
-        diameter = dp(44)
+        diameter = dp(48)
         cx = self.center_x
-        cy = self.pos[1] + self.height - dp(22)
+        cy = self.pos[1] + self.height - dp(24)
         self.bg_circle.pos = (cx - diameter / 2, cy - diameter / 2)
         self.bg_circle.size = (diameter, diameter)
 
 
-class ClickableBox(ButtonBehavior, BoxLayout):
-    pass
-
-
-def make_category_banner_slide(cat_name, icon_texture, on_press):
-    """Diapositiva del banner rotativo que muestra cada categoría (reemplaza el buscador)."""
-    slide = ClickableBox(orientation="horizontal", padding=dp(14), spacing=dp(12))
-    with slide.canvas.before:
-        Color(*COLOR_PRIMARY)
-        rect = RoundedRectangle(pos=slide.pos, size=slide.size, radius=[0])
-        slide.bind(pos=lambda i, v: setattr(rect, "pos", v))
-        slide.bind(size=lambda i, v: setattr(rect, "size", v))
-    slide.bind(on_press=lambda i: on_press(cat_name))
-
-    if icon_texture:
-        slide.add_widget(Image(texture=icon_texture, size_hint=(None, None), size=(dp(40), dp(40))))
-    slide.add_widget(Label(text=cat_name, font_size="18sp", bold=True, color=COLOR_WHITE))
-    return slide
+def _center_anchor(widget):
+    from kivy.uix.anchorlayout import AnchorLayout
+    anchor = AnchorLayout(anchor_x="center", anchor_y="center")
+    anchor.add_widget(widget)
+    return anchor
 
 
 def loading_label(text="Cargando recetas..."):
@@ -289,15 +276,6 @@ class HomeScreen(Screen):
             cat_row.add_widget(btn)
         root.add_widget(cat_row)
 
-        # Banner rotativo de categorías (ocupa el lugar donde antes estaba la búsqueda)
-        self.category_banner = Carousel(direction="right", size_hint_y=None, height=dp(70))
-        for cat_name in CATEGORIES.keys():
-            self.category_banner.add_widget(make_category_banner_slide(
-                cat_name, get_icon_texture(cat_name), self.open_category_by_name,
-            ))
-        root.add_widget(self.category_banner)
-        Clock.schedule_interval(self._advance_banner, 3)
-
         self.body_scroll = ScrollView()
         self.body = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
         self.body.bind(minimum_height=self.body.setter("height"))
@@ -306,13 +284,6 @@ class HomeScreen(Screen):
         root.add_widget(self.body_scroll)
 
         self.add_widget(root)
-
-    def _advance_banner(self, dt):
-        if not self.category_banner.slides:
-            return
-        idx = self.category_banner.index
-        nxt = (idx + 1) % len(self.category_banner.slides)
-        self.category_banner.load_slide(self.category_banner.slides[nxt])
 
     def load_posts(self, query=None):
         self.body.clear_widgets()
