@@ -38,13 +38,32 @@ from blogger_api import fetch_posts
 # Helpers de UI
 # ---------------------------------------------------------------------------
 
-def flat_button(text, bg_color, text_color=COLOR_WHITE, height=dp(50), font_size="16sp", bold=True):
-    return Button(
-        text=text, size_hint_y=None, height=height,
-        background_normal="", background_down="",
-        background_color=bg_color, color=text_color,
-        font_size=font_size, bold=bold,
-    )
+class RoundButton(ButtonBehavior, BoxLayout):
+    """Botón rectangular con esquinas redondeadas (round rectangle), color naranja."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            self._color_instr = Color(*COLOR_PRIMARY)
+            self._rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(14)])
+        self.bind(pos=self._update_rect, size=self._update_rect)
+        self._label = Label(bold=True)
+        self.add_widget(self._label)
+
+    def _update_rect(self, *args):
+        self._rect.pos = self.pos
+        self._rect.size = self.size
+
+
+def flat_button(text, bg_color=None, text_color=COLOR_WHITE, height=dp(50), font_size="16sp", bold=True):
+    """Crea un botón round-rectangle naranja (bg_color se ignora a propósito:
+    todos los botones del sitio usan el mismo estilo naranja)."""
+    btn = RoundButton(size_hint_y=None, height=height)
+    btn._label.text = text
+    btn._label.color = text_color
+    btn._label.font_size = font_size
+    btn._label.bold = bold
+    return btn
 
 
 def autosize_label(text, markup=False, font_size="15sp", color=COLOR_TEXT, bold=False, width_padding=dp(24)):
@@ -74,21 +93,13 @@ def section_title(text):
     return autosize_label(text, font_size="19sp", bold=True, color=COLOR_PRIMARY_DARK, width_padding=dp(28))
 
 
-def make_header(show_back=False, on_back=None):
-    header = BoxLayout(size_hint_y=None, height=LOGO_HEIGHT + dp(6), padding=(dp(8), dp(1)))
+def make_header():
+    header = BoxLayout(size_hint_y=None, height=LOGO_HEIGHT, padding=(dp(8), 0))
     with header.canvas.before:
         Color(1, 1, 1, 1)
         rect = RoundedRectangle(pos=header.pos, size=header.size, radius=[0])
         header.bind(pos=lambda i, v: setattr(rect, "pos", v))
         header.bind(size=lambda i, v: setattr(rect, "size", v))
-
-    if show_back:
-        back_btn = flat_button("< Volver", COLOR_PRIMARY_DARK, height=dp(36), font_size="12sp")
-        back_btn.size_hint = (None, None)
-        back_btn.width = dp(84)
-        if on_back:
-            back_btn.bind(on_press=on_back)
-        header.add_widget(back_btn)
 
     from kivy.uix.anchorlayout import AnchorLayout
     logo_anchor = AnchorLayout(anchor_x="center", anchor_y="center")
@@ -100,6 +111,45 @@ def make_header(show_back=False, on_back=None):
     logo_anchor.add_widget(logo)
     header.add_widget(logo_anchor)
     return header
+
+
+def make_back_row(on_back):
+    row = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(8), dp(4)))
+    back_btn = flat_button("< Volver", height=dp(32), font_size="12sp")
+    back_btn.size_hint_x = None
+    back_btn.width = dp(90)
+    if on_back:
+        back_btn.bind(on_press=on_back)
+    row.add_widget(back_btn)
+    return row
+
+
+def make_category_row(on_category):
+    """Fila de iconos de categoría con fondo negro, reutilizada en todas las pantallas."""
+    cat_row = BoxLayout(size_hint_y=None, height=dp(72), padding=(dp(6), dp(4)), spacing=dp(4))
+    with cat_row.canvas.before:
+        Color(0, 0, 0, 1)
+        rect = RoundedRectangle(pos=cat_row.pos, size=cat_row.size, radius=[0])
+        cat_row.bind(pos=lambda i, v: setattr(rect, "pos", v))
+        cat_row.bind(size=lambda i, v: setattr(rect, "size", v))
+    for cat_name in CATEGORIES.keys():
+        btn = CategoryButton(cat_name, icon_texture=get_icon_texture(cat_name), size_hint_x=1)
+        btn.bind(on_press=lambda inst, name=cat_name: on_category(name))
+        cat_row.add_widget(btn)
+    return cat_row
+
+
+def make_full_top_nav(on_category, show_back=False, on_back=None):
+    """Encabezado completo (igual estilo que la portada) reutilizado en todas las pantallas:
+    barra de aviso, logo y menú de categorías con fondo negro."""
+    wrap = BoxLayout(orientation="vertical", size_hint_y=None)
+    wrap.bind(minimum_height=wrap.setter("height"))
+    if show_back:
+        wrap.add_widget(make_back_row(on_back))
+    wrap.add_widget(make_tagline_bar())
+    wrap.add_widget(make_header())
+    wrap.add_widget(make_category_row(on_category))
+    return wrap
 
 
 def make_recipe_card(post, on_press):
@@ -265,16 +315,7 @@ class HomeScreen(Screen):
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_tagline_bar())
-        root.add_widget(make_header())
-
-        cat_row = BoxLayout(size_hint_y=None, height=dp(72), padding=(dp(6), dp(4)), spacing=dp(4))
-        for cat_name in CATEGORIES.keys():
-            btn = CategoryButton(cat_name, icon_texture=get_icon_texture(cat_name),
-                                  size_hint_x=1)
-            btn.bind(on_press=lambda inst, name=cat_name: self.open_category_by_name(name))
-            cat_row.add_widget(btn)
-        root.add_widget(cat_row)
+        root.add_widget(make_full_top_nav(self.open_category_by_name))
 
         self.body_scroll = ScrollView()
         self.body = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
@@ -293,12 +334,19 @@ class HomeScreen(Screen):
     def show_posts(self, posts):
         self.body.clear_widgets()
 
-        # Carrusel destacado (como la portada de la web)
+        # Carrusel destacado (como la portada de la web) con fondo negro
         if posts:
+            carousel_wrap = BoxLayout(size_hint_y=None, height=dp(320))
+            with carousel_wrap.canvas.before:
+                Color(0, 0, 0, 1)
+                rect = RoundedRectangle(pos=carousel_wrap.pos, size=carousel_wrap.size, radius=[0])
+                carousel_wrap.bind(pos=lambda i, v: setattr(rect, "pos", v))
+                carousel_wrap.bind(size=lambda i, v: setattr(rect, "size", v))
             carousel = Carousel(direction="right", size_hint_y=None, height=dp(320))
             for post in posts[:5]:
                 carousel.add_widget(make_featured_slide(post, self.open_detail))
-            self.body.add_widget(carousel)
+            carousel_wrap.add_widget(carousel)
+            self.body.add_widget(carousel_wrap)
 
         # Búsqueda (colocada debajo de la primera receta destacada)
         search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
@@ -383,7 +431,7 @@ class CategoryScreen(Screen):
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_header(show_back=True, on_back=self.go_back))
+        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=True, on_back=self.go_back))
 
         title_row = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(20), 0), spacing=dp(8))
         icon_tex = get_icon_texture(self.current_category)
@@ -450,6 +498,9 @@ class CategoryScreen(Screen):
         self.manager.transition = SlideTransition(direction="left")
         self.manager.current = "detail"
 
+    def open_category_by_name(self, category_name):
+        self.set_category(category_name)
+
     def go_back(self, instance):
         self.manager.transition = SlideTransition(direction="right")
         self.manager.current = "home"
@@ -467,7 +518,7 @@ class RecipeDetailScreen(Screen):
         self.return_to = return_to
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_header(show_back=True, on_back=self.go_back))
+        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=True, on_back=self.go_back))
 
         scroll = ScrollView()
         content = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(14), padding=dp(18))
@@ -504,6 +555,12 @@ class RecipeDetailScreen(Screen):
         scroll.add_widget(content)
         root.add_widget(scroll)
         self.add_widget(root)
+
+    def open_category_by_name(self, category_name):
+        cat_screen = self.manager.get_screen("category")
+        cat_screen.set_category(category_name)
+        self.manager.transition = SlideTransition(direction="left")
+        self.manager.current = "category"
 
     def go_back(self, instance):
         self.manager.transition = SlideTransition(direction="right")
