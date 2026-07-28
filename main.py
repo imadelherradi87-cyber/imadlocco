@@ -13,13 +13,13 @@ from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
-from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.image import AsyncImage, Image
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.carousel import Carousel
-from kivy.graphics import Color, RoundedRectangle
+from kivy.uix.stencilview import StencilView
+from kivy.graphics import Color, RoundedRectangle, Ellipse, Line
 
 from constants import (
     CATEGORIES, BLOG_URL,
@@ -152,62 +152,97 @@ def make_full_top_nav(on_category, show_back=False, on_back=None):
     return wrap
 
 
-def make_recipe_card(post, on_press):
-    """Tarjeta compacta de receta: miniatura + título + categorías."""
-    card = Card(orientation="horizontal", size_hint_y=None, height=dp(96),
-                padding=dp(8), spacing=dp(10))
+class RoundedImageBox(ButtonBehavior, StencilView):
+    """Contenedor que recorta cualquier imagen dentro en un rectángulo con
+    esquinas redondeadas (round rectangle), tal como en el sitio web."""
 
+    def __init__(self, radius=dp(14), **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            Color(1, 1, 1, 1)
+            self._rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[radius])
+        self.bind(pos=self._update_rect, size=self._update_rect)
+
+    def _update_rect(self, *args):
+        self._rect.pos = self.pos
+        self._rect.size = self.size
+
+
+class CircleArrowButton(ButtonBehavior, BoxLayout):
+    """Botón circular naranja con una flecha, para abrir la receta."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            Color(*COLOR_PRIMARY)
+            self._circle = Ellipse(pos=self.pos, size=self.size)
+        self.bind(pos=self._update_circle, size=self._update_circle)
+        self.add_widget(Label(text=">", bold=True, color=COLOR_WHITE, font_size="18sp"))
+
+    def _update_circle(self, *args):
+        self._circle.pos = self.pos
+        self._circle.size = self.size
+
+
+def make_recipe_card(post, on_press):
+    """Tarjeta grande de receta: imagen redondeada + título + extracto + botón circular."""
+    card = Card(orientation="horizontal", size_hint_y=None, height=dp(120),
+                padding=dp(10), spacing=dp(12))
+
+    image_box = RoundedImageBox(size_hint=(None, None), size=(dp(100), dp(100)))
     if post.get("imagen"):
-        thumb = AsyncImage(source=post["imagen"], size_hint=(None, None),
-                            width=dp(80), height=dp(80))
-    else:
-        thumb = BoxLayout(size_hint=(None, None), width=dp(80), height=dp(80))
-    card.add_widget(thumb)
+        img = AsyncImage(source=post["imagen"], allow_stretch=True, keep_ratio=False, size_hint=(1, 1))
+        image_box.add_widget(img)
+    image_box.bind(on_press=lambda i: on_press(post))
+    card.add_widget(image_box)
 
     info = BoxLayout(orientation="vertical", spacing=dp(4))
 
     title_lbl = Label(
         text=post.get("titulo", ""), font_size="15sp", bold=True, color=COLOR_TEXT,
         halign="left", valign="top", shorten=True, shorten_from="right",
-        size_hint_y=1,
+        size_hint_y=None, height=dp(40),
     )
     title_lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
     info.add_widget(title_lbl)
 
-    if post.get("categorias"):
-        cat_lbl = Label(
-            text=" · ".join(post["categorias"][:2]), font_size="12sp", color=COLOR_ACCENT,
-            halign="left", valign="bottom", shorten=True,
-            size_hint_y=None, height=dp(20),
-        )
-        cat_lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
-        info.add_widget(cat_lbl)
+    excerpt_text = (post.get("contenido_texto") or "").strip().replace("\n", " ")
+    if len(excerpt_text) > 90:
+        excerpt_text = excerpt_text[:90].rstrip() + "…"
+    excerpt_lbl = Label(
+        text=excerpt_text, font_size="12sp", color=COLOR_TEXT,
+        halign="left", valign="top", shorten=True,
+        size_hint_y=1,
+    )
+    excerpt_lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
+    info.add_widget(excerpt_lbl)
     card.add_widget(info)
 
-    btn = Button(background_normal="", background_down="", background_color=(0, 0, 0, 0))
-    btn.bind(on_press=lambda i: on_press(post))
-    card.add_widget(btn)
+    arrow_btn = CircleArrowButton(size_hint=(None, None), size=(dp(38), dp(38)))
+    arrow_btn.bind(on_press=lambda i: on_press(post))
+    card.add_widget(arrow_btn)
+
     return card
 
 
 def make_featured_slide(post, on_press):
     """Diapositiva grande del carrusel destacado (igual que la portada web)."""
-    slide = BoxLayout(orientation="vertical", padding=dp(4), spacing=dp(6))
+    slide = BoxLayout(orientation="vertical", padding=(dp(12), dp(10)), spacing=dp(8))
 
+    image_box = RoundedImageBox(size_hint=(1, 1))
     if post.get("imagen"):
-        img = AsyncImage(source=post["imagen"], size_hint=(1, 1), allow_stretch=True, keep_ratio=True)
-    else:
-        img = BoxLayout(size_hint=(1, 1))
-    slide.add_widget(img)
+        img = AsyncImage(source=post["imagen"], allow_stretch=True, keep_ratio=False, size_hint=(1, 1))
+        image_box.add_widget(img)
+    image_box.bind(on_press=lambda i: on_press(post))
+    slide.add_widget(image_box)
 
-    caption = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(90),
-                         padding=(dp(12), dp(6)), spacing=dp(4))
+    caption = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(90), spacing=dp(4))
     if post.get("fecha_es"):
         caption.add_widget(autosize_label(post["fecha_es"], font_size="12sp",
                                            color=COLOR_ACCENT, width_padding=dp(40)))
     caption.add_widget(autosize_label(post.get("titulo", ""), font_size="16sp", bold=True,
-                                       color=COLOR_TEXT, width_padding=dp(40)))
-    ver_btn = flat_button("Ver receta", COLOR_ACCENT, height=dp(36), font_size="12sp")
+                                       color=COLOR_WHITE, width_padding=dp(40)))
+    ver_btn = flat_button("Ver receta", height=dp(36), font_size="12sp")
     ver_btn.size_hint_y = None
     ver_btn.bind(on_press=lambda i: on_press(post))
     caption.add_widget(ver_btn)
@@ -235,10 +270,11 @@ class CategoryButton(ButtonBehavior, BoxLayout):
 
     def __init__(self, text, icon_texture=None, **kwargs):
         super().__init__(orientation="vertical", spacing=dp(2), **kwargs)
-        from kivy.graphics import Ellipse
         with self.canvas.before:
             Color(0, 0, 0, 1)
             self.bg_circle = Ellipse(pos=self.pos, size=(0, 0))
+            Color(1, 1, 1, 1)
+            self.bg_circle_outline = Line(circle=(0, 0, 0), width=dp(1.2))
         self.bind(pos=self._update_circle, size=self._update_circle)
 
         circle_wrap = BoxLayout(size_hint_y=None, height=dp(48))
@@ -249,7 +285,7 @@ class CategoryButton(ButtonBehavior, BoxLayout):
             circle_wrap.add_widget(icon_anchor)
         self.add_widget(circle_wrap)
 
-        self.add_widget(Label(text=text, font_size="10sp", bold=True, color=COLOR_TEXT,
+        self.add_widget(Label(text=text, font_size="10sp", bold=True, color=COLOR_WHITE,
                                size_hint_y=None, height=dp(16), shorten=True))
 
     def _update_circle(self, *args):
@@ -258,6 +294,7 @@ class CategoryButton(ButtonBehavior, BoxLayout):
         cy = self.pos[1] + self.height - dp(24)
         self.bg_circle.pos = (cx - diameter / 2, cy - diameter / 2)
         self.bg_circle.size = (diameter, diameter)
+        self.bg_circle_outline.circle = (cx, cy, diameter / 2)
 
 
 def _center_anchor(widget):
