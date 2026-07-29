@@ -66,10 +66,11 @@ def flat_button(text, bg_color=None, text_color=COLOR_WHITE, height=dp(50), font
     return btn
 
 
-def autosize_label(text, markup=False, font_size="15sp", color=COLOR_TEXT, bold=False, width_padding=dp(24)):
+def autosize_label(text, markup=False, font_size="15sp", color=COLOR_TEXT, bold=False,
+                    width_padding=dp(24), halign="left"):
     lbl = Label(
         text=text, markup=markup, font_size=font_size, color=color, bold=bold,
-        size_hint_y=None, halign="left", valign="top",
+        size_hint_y=None, halign=halign, valign="top",
     )
     lbl.text_size = (Window.width - width_padding, None)
     lbl.bind(texture_size=lambda instance, value: setattr(instance, "height", value[1]))
@@ -124,9 +125,30 @@ def make_back_row(on_back):
     return row
 
 
+def make_detail_back_row(on_back):
+    """Barra de regreso para la pantalla de detalle: fondo negro, botón
+    blanco con texto negro, solo la palabra 'Volver' sin flecha."""
+    row = BoxLayout(size_hint_y=None, height=dp(48), padding=(dp(10), dp(6)))
+    with row.canvas.before:
+        Color(0, 0, 0, 1)
+        rect = RoundedRectangle(pos=row.pos, size=row.size, radius=[0])
+        row.bind(pos=lambda i, v: setattr(rect, "pos", v))
+        row.bind(size=lambda i, v: setattr(rect, "size", v))
+
+    back_btn = RoundButton(size_hint=(None, None), width=dp(90), height=dp(34))
+    back_btn._color_instr.rgba = (1, 1, 1, 1)
+    back_btn._label.text = "Volver"
+    back_btn._label.color = (0, 0, 0, 1)
+    back_btn._label.font_size = "12sp"
+    if on_back:
+        back_btn.bind(on_press=on_back)
+    row.add_widget(back_btn)
+    return row
+
+
 def make_category_row(on_category):
     """Fila de iconos de categoría con fondo negro, reutilizada en todas las pantallas."""
-    cat_row = BoxLayout(size_hint_y=None, height=dp(72), padding=(dp(6), dp(4)), spacing=dp(4))
+    cat_row = BoxLayout(size_hint_y=None, height=dp(64), padding=(dp(6), dp(4)), spacing=dp(4))
     with cat_row.canvas.before:
         Color(0, 0, 0, 1)
         rect = RoundedRectangle(pos=cat_row.pos, size=cat_row.size, radius=[0])
@@ -139,25 +161,32 @@ def make_category_row(on_category):
     return cat_row
 
 
-def make_full_top_nav(on_category, show_back=False, on_back=None):
+def make_full_top_nav(on_category, show_back=False, on_back=None, detail_mode=False):
     """Encabezado completo (igual estilo que la portada) reutilizado en todas las pantallas:
     barra de aviso, logo y menú de categorías con fondo negro."""
     wrap = BoxLayout(orientation="vertical", size_hint_y=None)
     wrap.bind(minimum_height=wrap.setter("height"))
     if show_back:
-        wrap.add_widget(make_back_row(on_back))
-    wrap.add_widget(make_tagline_bar())
+        if detail_mode:
+            wrap.add_widget(make_detail_back_row(on_back))
+        else:
+            wrap.add_widget(make_back_row(on_back))
+    if not detail_mode:
+        wrap.add_widget(make_tagline_bar())
     wrap.add_widget(make_header())
     wrap.add_widget(make_category_row(on_category))
     return wrap
 
 
 class RoundedImageBox(ButtonBehavior, StencilView):
-    """Contenedor que recorta cualquier imagen dentro en un rectángulo con
-    esquinas redondeadas (round rectangle), tal como en el sitio web."""
+    """Contenedor que recorta una imagen en un rectángulo con esquinas
+    redondeadas. StencilView no distribuye hijos automáticamente, así que
+    aquí ajustamos manualmente la posición/tamaño de la imagen."""
 
     def __init__(self, radius=dp(14), **kwargs):
         super().__init__(**kwargs)
+        self._radius = radius
+        self._child_img = None
         with self.canvas.before:
             Color(1, 1, 1, 1)
             self._rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[radius])
@@ -166,6 +195,19 @@ class RoundedImageBox(ButtonBehavior, StencilView):
     def _update_rect(self, *args):
         self._rect.pos = self.pos
         self._rect.size = self.size
+        if self._child_img is not None:
+            self._child_img.pos = self.pos
+            self._child_img.size = self.size
+
+    def set_image(self, source):
+        if self._child_img is not None:
+            self.remove_widget(self._child_img)
+            self._child_img = None
+        if source:
+            img = AsyncImage(source=source, allow_stretch=True, keep_ratio=False,
+                              pos=self.pos, size=self.size)
+            self.add_widget(img)
+            self._child_img = img
 
 
 class CircleArrowButton(ButtonBehavior, BoxLayout):
@@ -190,9 +232,7 @@ def make_recipe_card(post, on_press):
                 padding=dp(10), spacing=dp(12))
 
     image_box = RoundedImageBox(size_hint=(None, None), size=(dp(100), dp(100)))
-    if post.get("imagen"):
-        img = AsyncImage(source=post["imagen"], allow_stretch=True, keep_ratio=False, size_hint=(1, 1))
-        image_box.add_widget(img)
+    image_box.set_image(post.get("imagen"))
     image_box.bind(on_press=lambda i: on_press(post))
     card.add_widget(image_box)
 
@@ -230,16 +270,14 @@ def make_featured_slide(post, on_press):
     slide = BoxLayout(orientation="vertical", padding=(dp(12), dp(10)), spacing=dp(8))
 
     image_box = RoundedImageBox(size_hint=(1, 1))
-    if post.get("imagen"):
-        img = AsyncImage(source=post["imagen"], allow_stretch=True, keep_ratio=False, size_hint=(1, 1))
-        image_box.add_widget(img)
+    image_box.set_image(post.get("imagen"))
     image_box.bind(on_press=lambda i: on_press(post))
     slide.add_widget(image_box)
 
     caption = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(90), spacing=dp(4))
     if post.get("fecha_es"):
         caption.add_widget(autosize_label(post["fecha_es"], font_size="12sp",
-                                           color=COLOR_ACCENT, width_padding=dp(40)))
+                                           color=COLOR_WHITE, width_padding=dp(40)))
     caption.add_widget(autosize_label(post.get("titulo", ""), font_size="16sp", bold=True,
                                        color=COLOR_WHITE, width_padding=dp(40)))
     ver_btn = flat_button("Ver receta", height=dp(36), font_size="12sp")
@@ -277,21 +315,21 @@ class CategoryButton(ButtonBehavior, BoxLayout):
             self.bg_circle_outline = Line(circle=(0, 0, 0), width=dp(1.2))
         self.bind(pos=self._update_circle, size=self._update_circle)
 
-        circle_wrap = BoxLayout(size_hint_y=None, height=dp(48))
+        circle_wrap = BoxLayout(size_hint_y=None, height=dp(40))
         if icon_texture:
-            icon = Image(texture=icon_texture, size_hint=(None, None), size=(dp(32), dp(32)))
+            icon = Image(texture=icon_texture, size_hint=(None, None), size=(dp(24), dp(24)))
             icon.pos_hint = {"center_x": 0.5, "center_y": 0.5}
             icon_anchor = _center_anchor(icon)
             circle_wrap.add_widget(icon_anchor)
         self.add_widget(circle_wrap)
 
-        self.add_widget(Label(text=text, font_size="10sp", bold=True, color=COLOR_WHITE,
-                               size_hint_y=None, height=dp(16), shorten=True))
+        self.add_widget(Label(text=text, font_size="9sp", bold=True, color=COLOR_WHITE,
+                               size_hint_y=None, height=dp(14), shorten=True))
 
     def _update_circle(self, *args):
-        diameter = dp(48)
+        diameter = dp(40)
         cx = self.center_x
-        cy = self.pos[1] + self.height - dp(24)
+        cy = self.pos[1] + self.height - dp(20)
         self.bg_circle.pos = (cx - diameter / 2, cy - diameter / 2)
         self.bg_circle.size = (diameter, diameter)
         self.bg_circle_outline.circle = (cx, cy, diameter / 2)
@@ -302,6 +340,21 @@ def _center_anchor(widget):
     anchor = AnchorLayout(anchor_x="center", anchor_y="center")
     anchor.add_widget(widget)
     return anchor
+
+
+class RoundedInputWrap(BoxLayout):
+    """Fondo blanco redondeado detrás de un TextInput transparente (round rectangle)."""
+
+    def __init__(self, radius=dp(22), bg_color=COLOR_CARD, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            Color(*bg_color)
+            self._rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[radius])
+        self.bind(pos=self._update_rect, size=self._update_rect)
+
+    def _update_rect(self, *args):
+        self._rect.pos = self.pos
+        self._rect.size = self.size
 
 
 def loading_label(text="Cargando recetas..."):
@@ -315,28 +368,30 @@ def error_label(text="No se pudieron cargar las recetas. Revisa tu conexión."):
 def make_about_section():
     box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=(0, dp(10)))
     box.bind(minimum_height=box.setter("height"))
-    box.add_widget(section_title("Sobre Kocina del Mundo"))
+
+    box.add_widget(autosize_label(
+        "Sobre Kocina del Mundo", font_size="19sp", bold=True,
+        color=COLOR_PRIMARY_DARK, width_padding=dp(28), halign="center",
+    ))
     box.add_widget(autosize_label(
         "Bienvenido a Kocina del Mundo, un rincón digital para viajar a través "
         "del sabor: recetas caseras, técnicas tradicionales e historias de "
         "cocinas de todo el planeta, explicadas paso a paso.",
-        font_size="14sp", width_padding=dp(28),
+        font_size="14sp", width_padding=dp(28), halign="center",
     ))
     return box
 
 
 def make_footer():
-    box = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(90),
+    box = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(56),
                      padding=(dp(20), dp(14)), spacing=dp(6))
     with box.canvas.before:
-        Color(*COLOR_PRIMARY_DARK)
+        Color(0, 0, 0, 1)
         rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[0])
         box.bind(pos=lambda i, v: setattr(rect, "pos", v))
         box.bind(size=lambda i, v: setattr(rect, "size", v))
-    box.add_widget(Label(text="Kocina del Mundo", bold=True, color=COLOR_WHITE, font_size="14sp",
-                          size_hint_y=None, height=dp(24)))
-    box.add_widget(Label(text="© Kocina del Mundo · Buen provecho", color=(1, 1, 1, 0.8),
-                          font_size="11sp", size_hint_y=None, height=dp(20)))
+    box.add_widget(Label(text="@kocina del mundo. Buen provechi", color=COLOR_WHITE,
+                          font_size="12sp", size_hint_y=None, height=dp(24)))
     return box
 
 
@@ -387,17 +442,20 @@ class HomeScreen(Screen):
 
         # Búsqueda (colocada debajo de la primera receta destacada)
         search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
+        input_wrap = RoundedInputWrap(radius=dp(22), size_hint_x=1)
         self.search_input = TextInput(
             hint_text="Buscar recetas...", multiline=False,
-            background_color=COLOR_CARD, foreground_color=COLOR_TEXT,
-            size_hint_x=1, padding=[dp(10), dp(10)],
+            background_normal="", background_active="", background_color=(0, 0, 0, 0),
+            foreground_color=COLOR_TEXT, hint_text_color=(0.45, 0.42, 0.38, 1),
+            cursor_color=COLOR_TEXT, padding=[dp(16), dp(12)],
         )
         self.search_input.bind(on_text_validate=self.do_search)
-        search_btn = flat_button("Buscar", COLOR_ACCENT, height=dp(44), font_size="13sp")
+        input_wrap.add_widget(self.search_input)
+        search_btn = flat_button("Buscar", height=dp(44), font_size="13sp")
         search_btn.size_hint_x = None
         search_btn.width = dp(90)
         search_btn.bind(on_press=self.do_search)
-        search_bar.add_widget(self.search_input)
+        search_bar.add_widget(input_wrap)
         search_bar.add_widget(search_btn)
         self.body.add_widget(search_bar)
 
@@ -555,7 +613,8 @@ class RecipeDetailScreen(Screen):
         self.return_to = return_to
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=True, on_back=self.go_back))
+        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=True,
+                                           on_back=self.go_back, detail_mode=True))
 
         scroll = ScrollView()
         content = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(14), padding=dp(18))
@@ -572,11 +631,11 @@ class RecipeDetailScreen(Screen):
         ))
 
         if post.get("fecha_es"):
-            content.add_widget(autosize_label(post["fecha_es"], font_size="12sp", color=COLOR_ACCENT))
+            content.add_widget(autosize_label(post["fecha_es"], font_size="12sp", color=COLOR_PRIMARY_DARK))
 
         if post.get("categorias"):
             content.add_widget(autosize_label(
-                " · ".join(post["categorias"]), font_size="13sp", color=COLOR_ACCENT, bold=True,
+                " · ".join(post["categorias"]), font_size="13sp", color=COLOR_PRIMARY_DARK, bold=True,
             ))
 
         content.add_widget(autosize_label(
