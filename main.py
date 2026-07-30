@@ -5,10 +5,16 @@ https://kocinadelmundo24.blogspot.com (recetas cargadas en vivo desde Blogger).
 """
 
 import webbrowser
+import base64
+import os
+import tempfile
 
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
+from kivy.loader import Loader
+from kivy.graphics.texture import Texture
+from kivy.loader import Loader
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -21,6 +27,21 @@ from kivy.uix.carousel import Carousel
 from kivy.uix.stencilview import StencilView
 from kivy.graphics import Color, RoundedRectangle, Ellipse, Line
 
+# Reemplaza el spinner de carga (feo, con círculos) por una imagen transparente
+# de 1x1 para que las fotos simplemente aparezcan sin animación llamativa.
+_BLANK_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
+try:
+    _blank_path = os.path.join(tempfile.gettempdir(), "kocina_blank.png")
+    with open(_blank_path, "wb") as _f:
+        _f.write(base64.b64decode(_BLANK_PNG_B64))
+    Loader.loading_image = _blank_path
+    Loader.error_image = _blank_path
+except Exception:
+    pass
+
 from constants import (
     CATEGORIES, BLOG_URL,
     COLOR_BG, COLOR_PRIMARY, COLOR_PRIMARY_DARK, COLOR_ACCENT,
@@ -28,6 +49,13 @@ from constants import (
 )
 
 Window.clearcolor = COLOR_BG
+
+# Reemplaza la animación de "cargando" (bolas girando) de Kivy por un
+# marcador de posición transparente y limpio, para que las imágenes
+# aparezcan sin una animación llamativa mientras cargan.
+_blank_texture = Texture.create(size=(1, 1))
+_blank_texture.blit_buffer(bytes([255, 255, 255, 0]), colorfmt="rgba", bufferfmt="ubyte")
+Loader.loading_image = _blank_texture
 
 from logo import LOGO_TEXTURE, LOGO_HEIGHT, LOGO_WIDTH, LogoImage
 from icons import get_icon_texture
@@ -441,18 +469,18 @@ class HomeScreen(Screen):
             self.body.add_widget(carousel_wrap)
 
         # Búsqueda (colocada debajo de la primera receta destacada)
-        search_bar = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(10), spacing=dp(8))
-        input_wrap = RoundedInputWrap(radius=dp(22), size_hint_x=1)
+        search_bar = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), dp(4)), spacing=dp(8))
+        input_wrap = RoundedInputWrap(radius=dp(20), size_hint=(1, None), height=dp(44))
         self.search_input = TextInput(
             hint_text="Buscar recetas...", multiline=False,
             background_normal="", background_active="", background_color=(0, 0, 0, 0),
             foreground_color=COLOR_TEXT, hint_text_color=(0.45, 0.42, 0.38, 1),
-            cursor_color=COLOR_TEXT, padding=[dp(16), dp(12)],
+            cursor_color=COLOR_TEXT, padding=[dp(16), dp(11)],
         )
         self.search_input.bind(on_text_validate=self.do_search)
         input_wrap.add_widget(self.search_input)
         search_btn = flat_button("Buscar", height=dp(44), font_size="13sp")
-        search_btn.size_hint_x = None
+        search_btn.size_hint = (None, None)
         search_btn.width = dp(90)
         search_btn.bind(on_press=self.do_search)
         search_bar.add_widget(input_wrap)
@@ -675,7 +703,23 @@ class KocinaApp(App):
         sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
         sm.current = "home"
+        Window.bind(on_keyboard=self.on_keyboard)
         return sm
+
+    def on_keyboard(self, window, key, *args):
+        # key 27 = botón físico/gesto "atrás" de Android
+        if key == 27:
+            sm = self.root
+            current = sm.current
+            if current == "detail":
+                sm.get_screen("detail").go_back(None)
+                return True
+            if current == "category":
+                sm.get_screen("category").go_back(None)
+                return True
+            # En la pantalla de inicio, deja que Android cierre la app normalmente
+            return False
+        return False
 
 
 if __name__ == "__main__":
