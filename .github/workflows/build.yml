@@ -13,6 +13,7 @@ jobs:
 
       - name: Build APK with official Kivy Docker image
         run: |
+          set -o pipefail
           docker run --rm -v ${{ github.workspace }}:/home/user/hostcwd kivy/buildozer android debug 2>&1 | tee build_log.txt
 
       - name: Upload build log
