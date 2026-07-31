@@ -14,7 +14,7 @@ jobs:
       - name: Build APK with official Kivy Docker image
         run: |
           set -o pipefail
-          yes | docker run --rm -i -v ${{ github.workspace }}:/home/user/hostcwd kivy/buildozer android debug 2>&1 | tee build_log.txt
+          ( yes || true ) | docker run --rm -i -v ${{ github.workspace }}:/home/user/hostcwd kivy/buildozer android debug 2>&1 | tee build_log.txt
 
       - name: Upload build log
         if: always()
