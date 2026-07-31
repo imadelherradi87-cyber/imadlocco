@@ -641,7 +641,7 @@ class RecipeDetailScreen(Screen):
         self.return_to = return_to
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=True,
+        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=False,
                                            on_back=self.go_back, detail_mode=True))
 
         scroll = ScrollView()
@@ -692,6 +692,39 @@ class RecipeDetailScreen(Screen):
 
 
 # ---------------------------------------------------------------------------
+# Splash: muestra el logo antes de que cargue el contenido de la app
+# ---------------------------------------------------------------------------
+
+class SplashScreen(Screen):
+    def on_enter(self, *args):
+        Clock.schedule_once(self._go_home, 1.2)
+
+    def build_ui_once(self):
+        if self.children:
+            return
+        root = BoxLayout(orientation="vertical")
+        with root.canvas.before:
+            Color(1, 1, 1, 1)
+            rect = RoundedRectangle(pos=root.pos, size=root.size, radius=[0])
+            root.bind(pos=lambda i, v: setattr(rect, "pos", v))
+            root.bind(size=lambda i, v: setattr(rect, "size", v))
+
+        from kivy.uix.anchorlayout import AnchorLayout
+        anchor = AnchorLayout(anchor_x="center", anchor_y="center")
+        if LOGO_TEXTURE:
+            logo = LogoImage(texture=LOGO_TEXTURE, size_hint=(None, None),
+                              width=dp(240), height=dp(160))
+        else:
+            logo = Label(text="Kocina del Mundo", font_size="24sp", bold=True, color=COLOR_PRIMARY)
+        anchor.add_widget(logo)
+        root.add_widget(anchor)
+        self.add_widget(root)
+
+    def _go_home(self, dt):
+        self.manager.current = "home"
+
+
+# ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 
@@ -699,10 +732,13 @@ class KocinaApp(App):
     def build(self):
         self.title = "Kocina del Mundo"
         sm = ScreenManager()
+        splash = SplashScreen(name="splash")
+        splash.build_ui_once()
+        sm.add_widget(splash)
         sm.add_widget(HomeScreen(name="home"))
         sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
-        sm.current = "home"
+        sm.current = "splash"
         Window.bind(on_keyboard=self.on_keyboard)
         return sm
 
