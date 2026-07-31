@@ -728,6 +728,33 @@ class SplashScreen(Screen):
 # App
 # ---------------------------------------------------------------------------
 
+class CrashScreen(Screen):
+    """Se muestra si algo falla, con el error en texto para poder
+    hacer una captura de pantalla y enviarla, en vez de que la app
+    se cierre sin explicación."""
+
+    def show_error(self, error_text):
+        self.clear_widgets()
+        root = BoxLayout(orientation="vertical")
+        with root.canvas.before:
+            Color(1, 1, 1, 1)
+            rect = RoundedRectangle(pos=root.pos, size=root.size, radius=[0])
+            root.bind(pos=lambda i, v: setattr(rect, "pos", v))
+            root.bind(size=lambda i, v: setattr(rect, "size", v))
+
+        scroll = ScrollView()
+        content = BoxLayout(orientation="vertical", size_hint_y=None, padding=dp(16), spacing=dp(10))
+        content.bind(minimum_height=content.setter("height"))
+        content.add_widget(autosize_label(
+            "Ocurrió un error. Envía una captura de esta pantalla:",
+            font_size="16sp", bold=True, color=COLOR_DANGER, width_padding=dp(32),
+        ))
+        content.add_widget(autosize_label(error_text, font_size="12sp", color=COLOR_TEXT, width_padding=dp(32)))
+        scroll.add_widget(content)
+        root.add_widget(scroll)
+        self.add_widget(root)
+
+
 class KocinaApp(App):
     def build(self):
         self.title = "Kocina del Mundo"
@@ -738,9 +765,30 @@ class KocinaApp(App):
         sm.add_widget(HomeScreen(name="home"))
         sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
+        sm.add_widget(CrashScreen(name="crash"))
         sm.current = "splash"
         Window.bind(on_keyboard=self.on_keyboard)
+        self._install_crash_handler(sm)
         return sm
+
+    def _install_crash_handler(self, sm):
+        import traceback
+        from kivy.base import ExceptionHandler, ExceptionManager
+
+        app_self = self
+
+        class _Handler(ExceptionHandler):
+            def handle_exception(self, inst):
+                try:
+                    tb = traceback.format_exc()
+                    crash_screen = sm.get_screen("crash")
+                    crash_screen.show_error(tb)
+                    sm.current = "crash"
+                except Exception:
+                    pass
+                return ExceptionManager.PASS
+
+        ExceptionManager.add_handler(_Handler())
 
     def on_keyboard(self, window, key, *args):
         # key 27 = botón físico/gesto "atrás" de Android
