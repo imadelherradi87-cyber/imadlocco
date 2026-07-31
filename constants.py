@@ -11,9 +11,9 @@ BLOG_URL = "https://kocinadelmundo24.blogspot.com"
 # Categorías principales tal como aparecen en el menú del sitio web.
 # Cada una tiene sus subcategorías reales (usadas como labels en Blogger).
 CATEGORIES = {
-    "Panaderia": [
-        "Pan Casero", "Pan Integral", "Baguette", "Brioche",
-        "Croissants", "Bollería", "Empanadas", "Masa para Pizza",
+    "Bebidas": [
+        "Zumos", "Batidos", "Smoothies", "Café", "Té",
+        "Cócteles", "Limonadas", "Milkshakes",
     ],
     "Principales": [
         "Pollo", "Carne", "Cerdo", "Cordero", "Pescado", "Mariscos",
@@ -21,21 +21,21 @@ CATEGORIES = {
         "Comida Italiana", "Comida Mexicana", "Comida Asiática",
         "Recetas Vegetarianas", "Recetas Saludables",
     ],
-    "Helados": [
-        "Chocolate", "Vainilla", "Fresa", "Mango", "Coco",
-        "Yogur Helado", "Sorbetes", "Helados sin Máquina",
-    ],
-    "Bebidas": [
-        "Zumos", "Batidos", "Smoothies", "Café", "Té",
-        "Cócteles", "Limonadas", "Milkshakes",
+    "Entrantes": [
+        "Ensaladas", "Sopas", "Cremas", "Tapas", "Aperitivos",
+        "Bruschettas", "Salsas", "Guarniciones",
     ],
     "Postres": [
         "Tartas", "Cheesecake", "Flanes", "Brownies", "Galletas",
         "Muffins", "Chocolate", "Tiramisú", "Churros", "Postres sin horno",
     ],
-    "Entrantes": [
-        "Ensaladas", "Sopas", "Cremas", "Tapas", "Aperitivos",
-        "Bruschettas", "Salsas", "Guarniciones",
+    "Helados": [
+        "Chocolate", "Vainilla", "Fresa", "Mango", "Coco",
+        "Yogur Helado", "Sorbetes", "Helados sin Máquina",
+    ],
+    "Panaderia": [
+        "Pan Casero", "Pan Integral", "Baguette", "Brioche",
+        "Croissants", "Bollería", "Empanadas", "Masa para Pizza",
     ],
 }
 
