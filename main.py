@@ -13,8 +13,7 @@ from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
 from kivy.loader import Loader
-from kivy.graphics.texture import Texture
-from kivy.loader import Loader
+from kivy.core.image import Image as CoreImage
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -29,6 +28,10 @@ from kivy.graphics import Color, RoundedRectangle, Ellipse, Line
 
 # Reemplaza el spinner de carga (feo, con círculos) por una imagen transparente
 # de 1x1 para que las fotos simplemente aparezcan sin animación llamativa.
+# IMPORTANTE: Loader.loading_image debe ser un objeto CoreImage, no una ruta
+# de texto — pasar una ruta causaba un fallo silencioso dentro del hilo de
+# carga de imágenes en segundo plano (por eso la app se cerraba sin ningún
+# mensaje de error).
 _BLANK_PNG_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
     "+A8AAQUBAScY42YAAAAASUVORK5CYII="
@@ -37,8 +40,8 @@ try:
     _blank_path = os.path.join(tempfile.gettempdir(), "kocina_blank.png")
     with open(_blank_path, "wb") as _f:
         _f.write(base64.b64decode(_BLANK_PNG_B64))
-    Loader.loading_image = _blank_path
-    Loader.error_image = _blank_path
+    Loader.loading_image = CoreImage(_blank_path)
+    Loader.error_image = CoreImage(_blank_path)
 except Exception:
     pass
 
@@ -49,13 +52,6 @@ from constants import (
 )
 
 Window.clearcolor = COLOR_BG
-
-# Reemplaza la animación de "cargando" (bolas girando) de Kivy por un
-# marcador de posición transparente y limpio, para que las imágenes
-# aparezcan sin una animación llamativa mientras cargan.
-_blank_texture = Texture.create(size=(1, 1))
-_blank_texture.blit_buffer(bytes([255, 255, 255, 0]), colorfmt="rgba", bufferfmt="ubyte")
-Loader.loading_image = _blank_texture
 
 from logo import LOGO_TEXTURE, LOGO_HEIGHT, LOGO_WIDTH, LogoImage
 from icons import get_icon_texture
