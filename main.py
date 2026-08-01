@@ -23,7 +23,6 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.image import AsyncImage, Image
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.carousel import Carousel
-from kivy.uix.stencilview import StencilView
 from kivy.graphics import Color, RoundedRectangle, Ellipse, Line
 
 # Reemplaza el spinner de carga (feo, con círculos) por una imagen transparente
@@ -202,10 +201,12 @@ def make_full_top_nav(on_category, show_back=False, on_back=None, detail_mode=Fa
     return wrap
 
 
-class RoundedImageBox(ButtonBehavior, StencilView):
-    """Contenedor que recorta una imagen en un rectángulo con esquinas
-    redondeadas. StencilView no distribuye hijos automáticamente, así que
-    aquí ajustamos manualmente la posición/tamaño de la imagen."""
+class RoundedImageBox(ButtonBehavior, BoxLayout):
+    """Contenedor de imagen. (Nota: se quitó temporalmente el recorte de
+    esquinas redondeadas basado en StencilView, ya que esa técnica de
+    gráficos puede causar cierres nativos silenciosos en algunos
+    teléfonos Android. Las esquinas vuelven a ser rectas por ahora,
+    hasta confirmar que esto soluciona el cierre.)"""
 
     def __init__(self, radius=dp(14), **kwargs):
         super().__init__(**kwargs)
