@@ -5,15 +5,10 @@ https://kocinadelmundo24.blogspot.com (recetas cargadas en vivo desde Blogger).
 """
 
 import webbrowser
-import base64
-import os
-import tempfile
 
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.metrics import dp
-from kivy.loader import Loader
-from kivy.core.image import Image as CoreImage
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -24,25 +19,6 @@ from kivy.uix.image import AsyncImage, Image
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.carousel import Carousel
 from kivy.graphics import Color, RoundedRectangle, Ellipse, Line
-
-# Reemplaza el spinner de carga (feo, con círculos) por una imagen transparente
-# de 1x1 para que las fotos simplemente aparezcan sin animación llamativa.
-# IMPORTANTE: Loader.loading_image debe ser un objeto CoreImage, no una ruta
-# de texto — pasar una ruta causaba un fallo silencioso dentro del hilo de
-# carga de imágenes en segundo plano (por eso la app se cerraba sin ningún
-# mensaje de error).
-_BLANK_PNG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
-    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
-)
-try:
-    _blank_path = os.path.join(tempfile.gettempdir(), "kocina_blank.png")
-    with open(_blank_path, "wb") as _f:
-        _f.write(base64.b64decode(_BLANK_PNG_B64))
-    Loader.loading_image = CoreImage(_blank_path)
-    Loader.error_image = CoreImage(_blank_path)
-except Exception:
-    pass
 
 from constants import (
     CATEGORIES, BLOG_URL,
@@ -426,11 +402,8 @@ def make_footer():
 
 class HomeScreen(Screen):
     def on_pre_enter(self, *args):
-        debug_log("HOME: on_pre_enter start")
         self.build_ui()
-        debug_log("HOME: build_ui done")
         self.load_posts()
-        debug_log("HOME: load_posts called (fetch en curso)")
 
     def build_ui(self):
         self.clear_widgets()
@@ -452,12 +425,10 @@ class HomeScreen(Screen):
         fetch_posts(self.show_posts, on_error=self.show_error, query=query, max_results=20)
 
     def show_posts(self, posts):
-        debug_log(f"HOME: show_posts called with {len(posts)} posts")
         self.body.clear_widgets()
 
         # Carrusel destacado (como la portada de la web) con fondo negro
         if posts:
-            debug_log("HOME: building featured carousel")
             carousel_wrap = BoxLayout(size_hint_y=None, height=dp(320))
             with carousel_wrap.canvas.before:
                 Color(0, 0, 0, 1)
@@ -469,7 +440,6 @@ class HomeScreen(Screen):
                 carousel.add_widget(make_featured_slide(post, self.open_detail))
             carousel_wrap.add_widget(carousel)
             self.body.add_widget(carousel_wrap)
-            debug_log("HOME: featured carousel added OK")
 
         # Búsqueda (colocada debajo de la primera receta destacada)
         search_bar = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), dp(4)), spacing=dp(8))
@@ -489,7 +459,6 @@ class HomeScreen(Screen):
         search_bar.add_widget(input_wrap)
         search_bar.add_widget(search_btn)
         self.body.add_widget(search_bar)
-        debug_log("HOME: search bar added OK")
 
         results_wrap = BoxLayout(orientation="vertical", size_hint_y=None,
                                   spacing=dp(10), padding=dp(14))
@@ -502,21 +471,16 @@ class HomeScreen(Screen):
                 text="No se encontraron recetas.", color=COLOR_TEXT,
                 size_hint_y=None, height=dp(40),
             ))
-        debug_log(f"HOME: building {len(posts)} recipe cards")
-        for i, post in enumerate(posts):
-            debug_log(f"HOME: building recipe card {i}")
+        for post in posts:
             results_wrap.add_widget(make_recipe_card(post, self.open_detail))
         self.body.add_widget(results_wrap)
-        debug_log("HOME: all recipe cards added OK")
 
         about_wrap = BoxLayout(orientation="vertical", size_hint_y=None, padding=(dp(14), 0))
         about_wrap.bind(minimum_height=about_wrap.setter("height"))
         about_wrap.add_widget(make_about_section())
         self.body.add_widget(about_wrap)
-        debug_log("HOME: about section added OK")
 
         self.body.add_widget(make_footer())
-        debug_log("HOME_REACHED_FULLY")
 
     def show_error(self, err):
         self.body.clear_widgets()
@@ -701,167 +665,18 @@ class RecipeDetailScreen(Screen):
 
 
 # ---------------------------------------------------------------------------
-# Splash: muestra el logo antes de que cargue el contenido de la app
-# ---------------------------------------------------------------------------
-
-class SplashScreen(Screen):
-    def on_enter(self, *args):
-        debug_log("SPLASH: on_enter, scheduling transition to home in 1.2s")
-        Clock.schedule_once(self._go_home, 1.2)
-
-    def build_ui_once(self):
-        if self.children:
-            return
-        debug_log("SPLASH: build_ui_once start")
-        root = BoxLayout(orientation="vertical")
-        with root.canvas.before:
-            Color(1, 1, 1, 1)
-            rect = RoundedRectangle(pos=root.pos, size=root.size, radius=[0])
-            root.bind(pos=lambda i, v: setattr(rect, "pos", v))
-            root.bind(size=lambda i, v: setattr(rect, "size", v))
-
-        from kivy.uix.anchorlayout import AnchorLayout
-        anchor = AnchorLayout(anchor_x="center", anchor_y="center")
-        if LOGO_TEXTURE:
-            logo = LogoImage(texture=LOGO_TEXTURE, size_hint=(None, None),
-                              width=dp(240), height=dp(160))
-        else:
-            logo = Label(text="Kocina del Mundo", font_size="24sp", bold=True, color=COLOR_PRIMARY)
-        anchor.add_widget(logo)
-        root.add_widget(anchor)
-        self.add_widget(root)
-        debug_log("SPLASH: build_ui_once done, UI added")
-
-    def _go_home(self, dt):
-        debug_log("SPLASH: _go_home firing, about to switch manager.current to 'home'")
-        self.manager.current = "home"
-        debug_log("SPLASH: manager.current set to 'home' successfully (returned without crashing)")
-
-
-# ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
-
-def debug_log(msg):
-    """Escribe una línea de diagnóstico en un archivo. Si la app se cierra
-    de forma nativa (sin mensaje de error), la próxima vez que se abra
-    mostrará el contenido de este archivo para saber exactamente en qué
-    paso se quedó."""
-    try:
-        app = App.get_running_app()
-        if app and getattr(app, "log_path", None):
-            with open(app.log_path, "a") as f:
-                f.write(msg + "\n")
-    except Exception:
-        pass
-
-
-class CrashScreen(Screen):
-    """Se muestra si algo falla, con el error en texto para poder
-    hacer una captura de pantalla y enviarla, en vez de que la app
-    se cierre sin explicación."""
-
-    def show_error(self, error_text):
-        self.clear_widgets()
-        root = BoxLayout(orientation="vertical")
-        with root.canvas.before:
-            Color(1, 1, 1, 1)
-            rect = RoundedRectangle(pos=root.pos, size=root.size, radius=[0])
-            root.bind(pos=lambda i, v: setattr(rect, "pos", v))
-            root.bind(size=lambda i, v: setattr(rect, "size", v))
-
-        scroll = ScrollView()
-        content = BoxLayout(orientation="vertical", size_hint_y=None, padding=dp(16), spacing=dp(10))
-        content.bind(minimum_height=content.setter("height"))
-        content.add_widget(autosize_label(
-            "Ocurrió un error. Envía una captura de esta pantalla:",
-            font_size="16sp", bold=True, color=COLOR_DANGER, width_padding=dp(32),
-        ))
-        content.add_widget(autosize_label(error_text, font_size="12sp", color=COLOR_TEXT, width_padding=dp(32)))
-        scroll.add_widget(content)
-        root.add_widget(scroll)
-        self.add_widget(root)
-
 
 class KocinaApp(App):
     def build(self):
         self.title = "Kocina del Mundo"
-
-        # Configura el archivo de diagnóstico y revisa si la sesión anterior
-        # se cerró sin llegar completamente a la pantalla de inicio.
-        self.log_path = os.path.join(self.user_data_dir, "debug_log.txt")
-        previous_log = None
-        try:
-            if os.path.exists(self.log_path):
-                with open(self.log_path, "r") as f:
-                    content = f.read()
-                if content and "HOME_REACHED_FULLY" not in content:
-                    previous_log = content
-        except Exception:
-            pass
-        try:
-            with open(self.log_path, "w") as f:
-                f.write("=== Nueva sesión iniciada ===\n")
-        except Exception:
-            pass
-
         sm = ScreenManager()
-        splash = SplashScreen(name="splash")
-        splash.build_ui_once()
-        sm.add_widget(splash)
         sm.add_widget(HomeScreen(name="home"))
         sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
-        sm.add_widget(CrashScreen(name="crash"))
-
-        if previous_log:
-            crash_screen = sm.get_screen("crash")
-            crash_screen.show_error(
-                "La sesión anterior no llegó a cargar la pantalla de inicio "
-                "por completo. Esto es lo último que se registró antes de "
-                "cerrarse:\n\n" + previous_log
-            )
-            sm.current = "crash"
-        else:
-            sm.current = "splash"
-
-        Window.bind(on_keyboard=self.on_keyboard)
-        self._install_crash_handler(sm)
+        sm.current = "home"
         return sm
-
-    def _install_crash_handler(self, sm):
-        import traceback
-        from kivy.base import ExceptionHandler, ExceptionManager
-
-        app_self = self
-
-        class _Handler(ExceptionHandler):
-            def handle_exception(self, inst):
-                try:
-                    tb = traceback.format_exc()
-                    crash_screen = sm.get_screen("crash")
-                    crash_screen.show_error(tb)
-                    sm.current = "crash"
-                except Exception:
-                    pass
-                return ExceptionManager.PASS
-
-        ExceptionManager.add_handler(_Handler())
-
-    def on_keyboard(self, window, key, *args):
-        # key 27 = botón físico/gesto "atrás" de Android
-        if key == 27:
-            sm = self.root
-            current = sm.current
-            if current == "detail":
-                sm.get_screen("detail").go_back(None)
-                return True
-            if current == "category":
-                sm.get_screen("category").go_back(None)
-                return True
-            # En la pantalla de inicio, deja que Android cierre la app normalmente
-            return False
-        return False
 
 
 if __name__ == "__main__":
