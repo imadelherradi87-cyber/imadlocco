@@ -206,6 +206,7 @@ class RoundedImageBox(ButtonBehavior, BoxLayout):
             self._child_img = None
         if source:
             img = AsyncImage(source=source, allow_stretch=True, keep_ratio=False,
+                              anim_delay=-1,
                               pos=self.pos, size=self.size)
             self.add_widget(img)
             self._child_img = img
@@ -527,7 +528,7 @@ class CategoryScreen(Screen):
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=True, on_back=self.go_back))
+        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=False, on_back=self.go_back))
 
         title_row = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(20), 0), spacing=dp(8))
         icon_tex = get_icon_texture(self.current_category)
@@ -624,7 +625,7 @@ class RecipeDetailScreen(Screen):
         if post.get("imagen"):
             content.add_widget(AsyncImage(
                 source=post["imagen"], size_hint=(1, None), height=dp(220),
-                allow_stretch=True, keep_ratio=True,
+                allow_stretch=True, keep_ratio=True, anim_delay=-1,
             ))
 
         content.add_widget(autosize_label(
@@ -676,7 +677,23 @@ class KocinaApp(App):
         sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
         sm.current = "home"
+        Window.bind(on_keyboard=self.on_keyboard)
         return sm
+
+    def on_keyboard(self, window, key, *args):
+        # key 27 = botón físico/gesto "atrás" de Android
+        if key == 27:
+            sm = self.root
+            current = sm.current
+            if current == "detail":
+                sm.get_screen("detail").go_back(None)
+                return True
+            if current == "category":
+                sm.get_screen("category").go_back(None)
+                return True
+            # En la pantalla de inicio, deja que Android cierre la app normalmente
+            return False
+        return False
 
 
 if __name__ == "__main__":
