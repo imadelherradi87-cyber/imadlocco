@@ -205,7 +205,7 @@ class RoundedImageBox(ButtonBehavior, BoxLayout):
             self.remove_widget(self._child_img)
             self._child_img = None
         if source:
-            img = AsyncImage(source=source, allow_stretch=True, keep_ratio=False,
+            img = AsyncImage(source=source, allow_stretch=True, keep_ratio=True,
                               anim_delay=-1,
                               pos=self.pos, size=self.size)
             self.add_widget(img)
