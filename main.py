@@ -29,7 +29,7 @@ from constants import (
 
 Window.clearcolor = COLOR_BG
 
-from logo import LOGO_TEXTURE, LOGO_HEIGHT, LOGO_WIDTH, LogoImage
+from logo import get_logo_texture, LOGO_HEIGHT, LOGO_WIDTH, LogoImage
 from icons import get_icon_texture
 from blogger_api import fetch_posts
 
@@ -117,8 +117,9 @@ def make_header():
 
     from kivy.uix.anchorlayout import AnchorLayout
     logo_anchor = AnchorLayout(anchor_x="center", anchor_y="center")
-    if LOGO_TEXTURE:
-        logo = LogoImage(texture=LOGO_TEXTURE, size_hint=(None, None),
+    logo_texture = get_logo_texture()
+    if logo_texture:
+        logo = LogoImage(texture=logo_texture, size_hint=(None, None),
                           width=LOGO_WIDTH, height=LOGO_HEIGHT)
     else:
         logo = Label(text="Kocina del Mundo", font_size="22sp", bold=True, color=COLOR_PRIMARY)
