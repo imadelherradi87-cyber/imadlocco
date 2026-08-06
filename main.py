@@ -34,19 +34,6 @@ from icons import get_icon_texture
 from blogger_api import fetch_posts
 
 
-def debug_log(msg):
-    """Escribe una línea de diagnóstico en un archivo. Si la app se cierra
-    de forma nativa (sin mensaje de error), la próxima vez que se abra
-    mostrará el contenido de este archivo para saber en qué paso se quedó."""
-    try:
-        app = App.get_running_app()
-        if app and getattr(app, "log_path", None):
-            with open(app.log_path, "a") as f:
-                f.write(msg + "\n")
-    except Exception:
-        pass
-
-
 # ---------------------------------------------------------------------------
 # Helpers de UI
 # ---------------------------------------------------------------------------
@@ -220,8 +207,7 @@ class RoundedImageBox(ButtonBehavior, BoxLayout):
             self.remove_widget(self._child_img)
             self._child_img = None
         if source:
-            img = AsyncImage(source=source, allow_stretch=True, keep_ratio=True,
-                              anim_delay=-1,
+            img = AsyncImage(source=source, allow_stretch=True, keep_ratio=False,
                               pos=self.pos, size=self.size)
             self.add_widget(img)
             self._child_img = img
@@ -374,46 +360,6 @@ class RoundedInputWrap(BoxLayout):
         self._rect.size = self.size
 
 
-def debug_log(msg):
-    """Escribe una línea de diagnóstico en un archivo de texto simple
-    (sin tocar nada de gráficos/hilos). Si la app se cierra de forma
-    nativa sin ningún mensaje, la próxima vez que se abra mostrará el
-    contenido de este archivo para saber en qué paso se quedó."""
-    try:
-        app = App.get_running_app()
-        if app and getattr(app, "log_path", None):
-            with open(app.log_path, "a") as f:
-                f.write(msg + "\n")
-    except Exception:
-        pass
-
-
-class CrashScreen(Screen):
-    """Se muestra si la sesión anterior no llegó a cargar la pantalla de
-    inicio por completo, mostrando el diagnóstico en texto."""
-
-    def show_error(self, error_text):
-        self.clear_widgets()
-        root = BoxLayout(orientation="vertical")
-        with root.canvas.before:
-            Color(1, 1, 1, 1)
-            rect = RoundedRectangle(pos=root.pos, size=root.size, radius=[0])
-            root.bind(pos=lambda i, v: setattr(rect, "pos", v))
-            root.bind(size=lambda i, v: setattr(rect, "size", v))
-
-        scroll = ScrollView()
-        content = BoxLayout(orientation="vertical", size_hint_y=None, padding=dp(16), spacing=dp(10))
-        content.bind(minimum_height=content.setter("height"))
-        content.add_widget(autosize_label(
-            "Diagnóstico de la sesión anterior:",
-            font_size="16sp", bold=True, color=COLOR_DANGER, width_padding=dp(32),
-        ))
-        content.add_widget(autosize_label(error_text, font_size="12sp", color=COLOR_TEXT, width_padding=dp(32)))
-        scroll.add_widget(content)
-        root.add_widget(scroll)
-        self.add_widget(root)
-
-
 def loading_label(text="Cargando recetas..."):
     return Label(text=text, color=COLOR_TEXT, size_hint_y=None, height=dp(60), font_size="15sp")
 
@@ -458,11 +404,8 @@ def make_footer():
 
 class HomeScreen(Screen):
     def on_pre_enter(self, *args):
-        debug_log("HOME: on_pre_enter start")
         self.build_ui()
-        debug_log("HOME: build_ui done")
         self.load_posts()
-        debug_log("HOME: load_posts called (fetch en curso)")
 
     def build_ui(self):
         self.clear_widgets()
@@ -484,12 +427,10 @@ class HomeScreen(Screen):
         fetch_posts(self.show_posts, on_error=self.show_error, query=query, max_results=20)
 
     def show_posts(self, posts):
-        debug_log(f"HOME: show_posts called with {len(posts)} posts")
         self.body.clear_widgets()
 
         # Carrusel destacado (como la portada de la web) con fondo negro
         if posts:
-            debug_log("HOME: building featured carousel")
             carousel_wrap = BoxLayout(size_hint_y=None, height=dp(320))
             with carousel_wrap.canvas.before:
                 Color(0, 0, 0, 1)
@@ -501,7 +442,6 @@ class HomeScreen(Screen):
                 carousel.add_widget(make_featured_slide(post, self.open_detail))
             carousel_wrap.add_widget(carousel)
             self.body.add_widget(carousel_wrap)
-            debug_log("HOME: featured carousel added OK")
 
         # Búsqueda (colocada debajo de la primera receta destacada)
         search_bar = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), dp(4)), spacing=dp(8))
@@ -521,7 +461,6 @@ class HomeScreen(Screen):
         search_bar.add_widget(input_wrap)
         search_bar.add_widget(search_btn)
         self.body.add_widget(search_bar)
-        debug_log("HOME: search bar added OK")
 
         results_wrap = BoxLayout(orientation="vertical", size_hint_y=None,
                                   spacing=dp(10), padding=dp(14))
@@ -534,24 +473,18 @@ class HomeScreen(Screen):
                 text="No se encontraron recetas.", color=COLOR_TEXT,
                 size_hint_y=None, height=dp(40),
             ))
-        debug_log(f"HOME: building {len(posts)} recipe cards")
         for i, post in enumerate(posts):
-            debug_log(f"HOME: building recipe card {i}")
             results_wrap.add_widget(make_recipe_card(post, self.open_detail))
         self.body.add_widget(results_wrap)
-        debug_log("HOME: all recipe cards added OK")
 
         about_wrap = BoxLayout(orientation="vertical", size_hint_y=None, padding=(dp(14), 0))
         about_wrap.bind(minimum_height=about_wrap.setter("height"))
         about_wrap.add_widget(make_about_section())
         self.body.add_widget(about_wrap)
-        debug_log("HOME: about section added OK")
 
         self.body.add_widget(make_footer())
-        debug_log("HOME_REACHED_FULLY")
 
     def show_error(self, err):
-        debug_log(f"HOME: show_error called: {err}")
         self.body.clear_widgets()
         self.body.add_widget(error_label())
 
@@ -693,7 +626,7 @@ class RecipeDetailScreen(Screen):
         if post.get("imagen"):
             content.add_widget(AsyncImage(
                 source=post["imagen"], size_hint=(1, None), height=dp(220),
-                allow_stretch=True, keep_ratio=True, anim_delay=-1,
+                allow_stretch=True, keep_ratio=True,
             ))
 
         content.add_widget(autosize_label(
@@ -740,62 +673,13 @@ class RecipeDetailScreen(Screen):
 class KocinaApp(App):
     def build(self):
         self.title = "Kocina del Mundo"
-
-        # Configura el archivo de diagnóstico y revisa si la sesión anterior
-        # se cerró sin llegar completamente a la pantalla de inicio.
-        self.log_path = os.path.join(self.user_data_dir, "debug_log.txt")
-        previous_log = None
-        try:
-            if os.path.exists(self.log_path):
-                with open(self.log_path, "r") as f:
-                    content = f.read()
-                if content and "HOME_REACHED_FULLY" not in content:
-                    previous_log = content
-        except Exception:
-            pass
-        try:
-            with open(self.log_path, "w") as f:
-                f.write("=== Nueva sesión iniciada ===\n")
-        except Exception:
-            pass
-
         sm = ScreenManager()
         sm.add_widget(HomeScreen(name="home"))
         sm.add_widget(CategoryScreen(name="category"))
         sm.add_widget(RecipeDetailScreen(name="detail"))
-        sm.add_widget(CrashScreen(name="crash"))
-
-        if previous_log:
-            crash_screen = sm.get_screen("crash")
-            crash_screen.show_error(
-                "La sesión anterior no llegó a cargar la pantalla de inicio "
-                "por completo. Esto es lo último registrado antes de "
-                "cerrarse:\n\n" + previous_log
-            )
-            sm.current = "crash"
-        else:
-            sm.current = "home"
-
+        sm.current = "home"
         Window.bind(on_keyboard=self.on_keyboard)
-        self._install_crash_handler(sm)
         return sm
-
-    def _install_crash_handler(self, sm):
-        import traceback
-        from kivy.base import ExceptionHandler, ExceptionManager
-
-        class _Handler(ExceptionHandler):
-            def handle_exception(self, inst):
-                try:
-                    tb = traceback.format_exc()
-                    crash_screen = sm.get_screen("crash")
-                    crash_screen.show_error(tb)
-                    sm.current = "crash"
-                except Exception:
-                    pass
-                return ExceptionManager.PASS
-
-        ExceptionManager.add_handler(_Handler())
 
     def on_keyboard(self, window, key, *args):
         # key 27 = botón físico/gesto "atrás" de Android
