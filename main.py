@@ -17,8 +17,10 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.image import AsyncImage, Image
+from kivy.uix.button import Button
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.carousel import Carousel
+from kivy.uix.dropdown import DropDown
 from kivy.graphics import Color, RoundedRectangle, Ellipse, Line
 
 from constants import (
@@ -147,8 +149,33 @@ def make_detail_back_row(on_back):
     return row
 
 
-def make_category_row(on_category):
-    """Fila de iconos de categoría con fondo negro, reutilizada en todas las pantallas."""
+def show_subcategory_dropdown(anchor_widget, main_category, on_select):
+    """Muestra un menú desplegable con las subcategorías, igual que en el
+    sitio web: al tocar un elemento del menú no navega a ningún lado,
+    solo despliega la lista para elegir una subcategoría."""
+    subcats = CATEGORIES.get(main_category, [])
+    dropdown = DropDown(auto_width=False, width=dp(190))
+
+    for sub in subcats:
+        item = Button(
+            text=sub, size_hint_y=None, height=dp(42),
+            background_normal="", background_down="",
+            background_color=COLOR_WHITE, color=COLOR_TEXT,
+            font_size="13sp", bold=True,
+        )
+        item.bind(on_release=lambda inst, s=sub: (
+            dropdown.dismiss(), on_select(main_category, s)
+        ))
+        dropdown.add_widget(item)
+
+    dropdown.open(anchor_widget)
+    return dropdown
+
+
+def make_category_row(on_subcategory_select):
+    """Fila de iconos de categoría con fondo negro, reutilizada en todas las
+    pantallas. Al tocar un icono se abre un menú desplegable con sus
+    subcategorías (no navega directamente)."""
     cat_row = BoxLayout(size_hint_y=None, height=dp(64), padding=(dp(6), dp(4)), spacing=dp(4))
     with cat_row.canvas.before:
         Color(0, 0, 0, 1)
@@ -157,7 +184,9 @@ def make_category_row(on_category):
         cat_row.bind(size=lambda i, v: setattr(rect, "size", v))
     for cat_name in CATEGORIES.keys():
         btn = CategoryButton(cat_name, icon_texture=get_icon_texture(cat_name), size_hint_x=1)
-        btn.bind(on_press=lambda inst, name=cat_name: on_category(name))
+        btn.bind(on_press=lambda inst, name=cat_name: show_subcategory_dropdown(
+            inst, name, on_subcategory_select
+        ))
         cat_row.add_widget(btn)
     return cat_row
 
@@ -410,7 +439,7 @@ class HomeScreen(Screen):
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_full_top_nav(self.open_category_by_name))
+        root.add_widget(make_full_top_nav(self.open_subcategory))
 
         self.body_scroll = ScrollView()
         self.body = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
@@ -501,9 +530,9 @@ class HomeScreen(Screen):
         self.manager.transition = SlideTransition(direction="left")
         self.manager.current = "category"
 
-    def open_category(self, instance):
+    def open_subcategory(self, main_category, subcategory):
         cat_screen = self.manager.get_screen("category")
-        cat_screen.set_category(instance.category_name)
+        cat_screen.set_category(main_category, initial_sub=subcategory)
         self.manager.transition = SlideTransition(direction="left")
         self.manager.current = "category"
 
@@ -521,15 +550,15 @@ class HomeScreen(Screen):
 class CategoryScreen(Screen):
     current_category = None
 
-    def set_category(self, category_name):
+    def set_category(self, category_name, initial_sub=None):
         self.current_category = category_name
         self.build_ui()
-        self.load_posts(category_name)
+        self.load_posts(initial_sub or category_name)
 
     def build_ui(self):
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=False, on_back=self.go_back))
+        root.add_widget(make_full_top_nav(self.open_subcategory, show_back=False, on_back=self.go_back))
 
         title_row = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(20), 0), spacing=dp(8))
         icon_tex = get_icon_texture(self.current_category)
@@ -599,6 +628,9 @@ class CategoryScreen(Screen):
     def open_category_by_name(self, category_name):
         self.set_category(category_name)
 
+    def open_subcategory(self, main_category, subcategory):
+        self.set_category(main_category, initial_sub=subcategory)
+
     def go_back(self, instance):
         self.manager.transition = SlideTransition(direction="right")
         self.manager.current = "home"
@@ -616,7 +648,7 @@ class RecipeDetailScreen(Screen):
         self.return_to = return_to
         self.clear_widgets()
         root = BoxLayout(orientation="vertical")
-        root.add_widget(make_full_top_nav(self.open_category_by_name, show_back=False,
+        root.add_widget(make_full_top_nav(self.open_subcategory, show_back=False,
                                            on_back=self.go_back, detail_mode=True))
 
         scroll = ScrollView()
@@ -658,6 +690,12 @@ class RecipeDetailScreen(Screen):
     def open_category_by_name(self, category_name):
         cat_screen = self.manager.get_screen("category")
         cat_screen.set_category(category_name)
+        self.manager.transition = SlideTransition(direction="left")
+        self.manager.current = "category"
+
+    def open_subcategory(self, main_category, subcategory):
+        cat_screen = self.manager.get_screen("category")
+        cat_screen.set_category(main_category, initial_sub=subcategory)
         self.manager.transition = SlideTransition(direction="left")
         self.manager.current = "category"
 
