@@ -154,15 +154,18 @@ def show_subcategory_dropdown(anchor_widget, main_category, on_select):
     sitio web: al tocar un elemento del menú no navega a ningún lado,
     solo despliega la lista para elegir una subcategoría."""
     subcats = CATEGORIES.get(main_category, [])
-    dropdown = DropDown(auto_width=False, width=dp(190))
+    dropdown = DropDown(auto_width=False, width=dp(150))
 
     for sub in subcats:
         item = Button(
-            text=sub, size_hint_y=None, height=dp(42),
+            text=sub, size_hint_y=None, height=dp(30),
             background_normal="", background_down="",
             background_color=COLOR_WHITE, color=COLOR_TEXT,
-            font_size="13sp", bold=True,
+            font_size="11sp", bold=True,
+            halign="left", valign="middle",
+            padding=(dp(12), 0),
         )
+        item.bind(size=lambda inst, val: setattr(inst, "text_size", val))
         item.bind(on_release=lambda inst, s=sub: (
             dropdown.dismiss(), on_select(main_category, s)
         ))
@@ -259,13 +262,18 @@ class CircleArrowButton(ButtonBehavior, BoxLayout):
 
 
 def make_recipe_card(post, on_press):
-    """Tarjeta grande de receta: imagen redondeada + título + extracto + botón circular."""
-    card = Card(orientation="horizontal", size_hint_y=None, height=dp(120),
-                padding=dp(10), spacing=dp(12))
+    """Tarjeta grande de receta: imagen redondeada + título + extracto."""
+    card = ClickableBox(orientation="horizontal", size_hint_y=None, height=dp(120),
+                         padding=dp(10), spacing=dp(12))
+    with card.canvas.before:
+        Color(*COLOR_CARD)
+        card._bg_rect = RoundedRectangle(pos=card.pos, size=card.size, radius=[dp(12)])
+    card.bind(pos=lambda i, v: setattr(card._bg_rect, "pos", v))
+    card.bind(size=lambda i, v: setattr(card._bg_rect, "size", v))
+    card.bind(on_press=lambda i: on_press(post))
 
     image_box = RoundedImageBox(size_hint=(None, None), size=(dp(100), dp(100)))
     image_box.set_image(post.get("imagen"))
-    image_box.bind(on_press=lambda i: on_press(post))
     card.add_widget(image_box)
 
     info = BoxLayout(orientation="vertical", spacing=dp(4))
@@ -290,10 +298,6 @@ def make_recipe_card(post, on_press):
     info.add_widget(excerpt_lbl)
     card.add_widget(info)
 
-    arrow_btn = CircleArrowButton(size_hint=(None, None), size=(dp(38), dp(38)))
-    arrow_btn.bind(on_press=lambda i: on_press(post))
-    card.add_widget(arrow_btn)
-
     return card
 
 
@@ -306,16 +310,12 @@ def make_featured_slide(post, on_press):
     image_box.bind(on_press=lambda i: on_press(post))
     slide.add_widget(image_box)
 
-    caption = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(90), spacing=dp(4))
+    caption = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(60), spacing=dp(4))
     if post.get("fecha_es"):
         caption.add_widget(autosize_label(post["fecha_es"], font_size="12sp",
                                            color=COLOR_WHITE, width_padding=dp(40)))
     caption.add_widget(autosize_label(post.get("titulo", ""), font_size="16sp", bold=True,
                                        color=COLOR_WHITE, width_padding=dp(40)))
-    ver_btn = flat_button("Ver receta", height=dp(36), font_size="12sp")
-    ver_btn.size_hint_y = None
-    ver_btn.bind(on_press=lambda i: on_press(post))
-    caption.add_widget(ver_btn)
     slide.add_widget(caption)
 
     return slide
@@ -569,28 +569,6 @@ class CategoryScreen(Screen):
             color=COLOR_PRIMARY_DARK, width_padding=dp(60),
         ))
         root.add_widget(title_row)
-
-        subcats = CATEGORIES.get(self.current_category, [])
-        chip_scroll = ScrollView(size_hint_y=None, height=dp(50), do_scroll_y=False, do_scroll_x=True)
-        chip_row = BoxLayout(size_hint_x=None, spacing=dp(6), padding=(dp(10), dp(4)))
-        chip_row.bind(minimum_width=chip_row.setter("width"))
-
-        all_btn = flat_button("Todo", COLOR_ACCENT, height=dp(38), font_size="12sp")
-        all_btn.size_hint_x = None
-        all_btn.width = dp(80)
-        all_btn.bind(on_press=lambda i: self.load_posts(self.current_category))
-        chip_row.add_widget(all_btn)
-
-        for sub in subcats:
-            chip = flat_button(sub, COLOR_PRIMARY_DARK, height=dp(38), font_size="12sp")
-            chip.size_hint_x = None
-            chip.width = dp(110)
-            chip.sub_name = sub
-            chip.bind(on_press=lambda i: self.load_posts(i.sub_name))
-            chip_row.add_widget(chip)
-
-        chip_scroll.add_widget(chip_row)
-        root.add_widget(chip_scroll)
 
         self.results_scroll = ScrollView()
         self.results_grid = GridLayout(cols=1, size_hint_y=None, spacing=dp(10), padding=dp(14))
