@@ -135,6 +135,8 @@ def fetch_posts(on_success, on_error=None, label=None, query=None, max_results=2
     if query:
         params += f"&q={quote(query)}"
 
+    full_url = url + params
+
     def _on_success(request, result):
         try:
             if isinstance(result, (bytes, str)):
@@ -144,18 +146,19 @@ def fetch_posts(on_success, on_error=None, label=None, query=None, max_results=2
             on_success(posts)
         except Exception as e:
             if on_error:
-                on_error(str(e))
+                on_error(f"{type(e).__name__}: {e}")
 
     def _on_error(request, error):
         if on_error:
-            on_error(str(error))
+            on_error(f"{type(error).__name__}: {error}")
 
     def _on_failure(request, result):
         if on_error:
-            on_error("request_failed")
+            status = getattr(request, "resp_status", "sin respuesta")
+            on_error(f"HTTP {status} al pedir {full_url}")
 
     UrlRequest(
-        url + params,
+        full_url,
         on_success=_on_success,
         on_error=_on_error,
         on_failure=_on_failure,
