@@ -394,7 +394,8 @@ def loading_label(text="Cargando recetas..."):
 
 
 def error_label(text="No se pudieron cargar las recetas. Revisa tu conexión."):
-    return Label(text=text, color=COLOR_DANGER, size_hint_y=None, height=dp(60), font_size="14sp")
+    return Label(text=text, color=COLOR_DANGER, size_hint_y=None, height=dp(100),
+                 font_size="13sp", halign="center")
 
 
 def make_about_section():
@@ -515,7 +516,10 @@ class HomeScreen(Screen):
 
     def show_error(self, err):
         self.body.clear_widgets()
-        self.body.add_widget(error_label())
+        self.body.add_widget(error_label(
+            "No se pudieron cargar las recetas. Revisa tu conexión.\n\n"
+            f"Detalle técnico: {err}"
+        ))
 
     def do_search(self, instance):
         query = self.search_input.text.strip()
@@ -595,7 +599,10 @@ class CategoryScreen(Screen):
 
     def show_error(self, err):
         self.results_grid.clear_widgets()
-        self.results_grid.add_widget(error_label())
+        self.results_grid.add_widget(error_label(
+            "No se pudieron cargar las recetas.\n\n"
+            f"Detalle técnico: {err}"
+        ))
 
     def open_detail(self, post):
         detail_screen = self.manager.get_screen("detail")
