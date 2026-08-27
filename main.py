@@ -261,6 +261,10 @@ class CircleArrowButton(ButtonBehavior, BoxLayout):
         self._circle.size = self.size
 
 
+class ClickableBox(ButtonBehavior, BoxLayout):
+    pass
+
+
 def make_recipe_card(post, on_press):
     """Tarjeta grande de receta: imagen redondeada + título + extracto."""
     card = ClickableBox(orientation="horizontal", size_hint_y=None, height=dp(120),
