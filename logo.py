@@ -18,7 +18,7 @@ from kivy.metrics import dp
 
 from logo_data import LOGO_BASE64
 
-LOGO_WIDTH = dp(195)
+LOGO_WIDTH = dp(253)
 LOGO_HEIGHT = dp(130)
 
 _logo_texture_cache = None
