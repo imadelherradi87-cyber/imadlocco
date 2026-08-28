@@ -6,7 +6,7 @@ ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "cambia_esta_clave"
 
 # Dirección del blog (fuente real de las recetas)
-BLOG_URL = "https://kocinadelmundo24.blogspot.com"
+BLOG_URL = "https://recipesmethod24.blogspot.com"
 
 # Categorías principales tal como aparecen en el menú del sitio web.
 # Cada una tiene sus subcategorías reales (usadas como labels en Blogger).
