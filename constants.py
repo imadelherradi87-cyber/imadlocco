@@ -1,15 +1,17 @@
 """
-Constantes y configuración de Kocina del Mundo.
+Constants and configuration for Recipes Method.
 """
 
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "cambia_esta_clave"
 
-# Dirección del blog (fuente real de las recetas)
+# Blog address (real source of the recipes)
 BLOG_URL = "https://recipesmethod24.blogspot.com"
 
-# Categorías principales tal como aparecen en el menú del sitio web.
-# Cada una tiene sus subcategorías reales (usadas como labels en Blogger).
+# Main categories exactly as they exist as Blogger post labels.
+# IMPORTANT: these values must stay unchanged (in Spanish) because they
+# are used to filter posts by label when talking to the Blogger feed.
+# See CATEGORY_LABELS_EN below for the English text shown to the user.
 CATEGORIES = {
     "Bebidas": [
         "Zumos", "Batidos", "Smoothies", "Café", "Té",
@@ -39,7 +41,51 @@ CATEGORIES = {
     ],
 }
 
-# Paleta de color extraída del logo (misma que la web)
+# English text shown on screen for each Spanish category/label above.
+# Used only for display -- the app still queries Blogger using the
+# original Spanish keys from CATEGORIES so filtering keeps working.
+CATEGORY_LABELS_EN = {
+    "Bebidas": "Drinks",
+    "Principales": "Main Dishes",
+    "Entrantes": "Starters",
+    "Postres": "Desserts",
+    "Helados": "Ice Cream",
+    "Panaderia": "Bakery",
+
+    "Zumos": "Juices", "Batidos": "Shakes", "Smoothies": "Smoothies",
+    "Café": "Coffee", "Té": "Tea", "Cócteles": "Cocktails",
+    "Limonadas": "Lemonades", "Milkshakes": "Milkshakes",
+
+    "Pollo": "Chicken", "Carne": "Beef", "Cerdo": "Pork",
+    "Cordero": "Lamb", "Pescado": "Fish", "Mariscos": "Seafood",
+    "Pasta": "Pasta", "Arroz": "Rice", "Pizza": "Pizza",
+    "Hamburguesas": "Burgers", "Comida Española": "Spanish Food",
+    "Comida Italiana": "Italian Food", "Comida Mexicana": "Mexican Food",
+    "Comida Asiática": "Asian Food",
+    "Recetas Vegetarianas": "Vegetarian Recipes",
+    "Recetas Saludables": "Healthy Recipes",
+
+    "Ensaladas": "Salads", "Sopas": "Soups", "Cremas": "Creamy Soups",
+    "Tapas": "Tapas", "Aperitivos": "Appetizers",
+    "Bruschettas": "Bruschettas", "Salsas": "Sauces",
+    "Guarniciones": "Side Dishes",
+
+    "Tartas": "Cakes", "Cheesecake": "Cheesecake", "Flanes": "Flans",
+    "Brownies": "Brownies", "Galletas": "Cookies", "Muffins": "Muffins",
+    "Chocolate": "Chocolate", "Tiramisú": "Tiramisu",
+    "Churros": "Churros", "Postres sin horno": "No-Bake Desserts",
+
+    "Vainilla": "Vanilla", "Fresa": "Strawberry", "Mango": "Mango",
+    "Coco": "Coconut", "Yogur Helado": "Frozen Yogurt",
+    "Sorbetes": "Sorbets", "Helados sin Máquina": "No-Machine Ice Cream",
+
+    "Pan Casero": "Homemade Bread", "Pan Integral": "Whole Wheat Bread",
+    "Baguette": "Baguette", "Brioche": "Brioche",
+    "Croissants": "Croissants", "Bollería": "Pastries",
+    "Empanadas": "Empanadas", "Masa para Pizza": "Pizza Dough",
+}
+
+# Color palette extracted from the logo
 COLOR_BG = (0.98, 0.95, 0.89, 1)
 COLOR_PRIMARY = (0.80, 0.33, 0.13, 1)
 COLOR_PRIMARY_DARK = (0.58, 0.21, 0.08, 1)
