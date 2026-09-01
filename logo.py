@@ -1,13 +1,13 @@
 """
 logo.py
-Carga el logo real desde base64. Si por algún motivo falla,
-main.py usa un texto de respaldo automáticamente.
+Loads the real logo from base64. If it fails for any reason,
+main.py automatically falls back to a text label.
 
-IMPORTANTE: la textura NO se crea al importar este archivo. Crear una
-textura (llamar a .texture) requiere que la ventana/contexto gráfico ya
-esté listo. Hacerlo al importar el módulo (demasiado temprano en Android)
-puede provocar un cierre nativo silencioso de la app. Por eso la carga
-se hace de forma diferida, la primera vez que se llama a get_logo_texture().
+IMPORTANT: the texture is NOT created at import time. Creating a
+texture (calling .texture) requires the graphics window/context to
+already be ready. Doing this at module import time (too early on
+Android) can cause a silent native crash. That's why loading is
+deferred until the first call to get_logo_texture().
 """
 
 import base64
@@ -19,7 +19,7 @@ from kivy.metrics import dp
 from logo_data import LOGO_BASE64
 
 LOGO_WIDTH = dp(253)
-LOGO_HEIGHT = dp(130)
+LOGO_HEIGHT = dp(136)  # aspect ratio ~1.86 (600x322 px)
 
 _logo_texture_cache = None
 _logo_load_attempted = False
@@ -37,7 +37,7 @@ def get_logo_texture():
     try:
         from kivy.core.image import Image as CoreImage
         image_data = base64.b64decode(LOGO_BASE64)
-        _logo_texture_cache = CoreImage(BytesIO(image_data), ext="png").texture
+        _logo_texture_cache = CoreImage(BytesIO(image_data), ext="jpg").texture
     except Exception:
         _logo_texture_cache = None
     return _logo_texture_cache
