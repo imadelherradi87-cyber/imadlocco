@@ -15,9 +15,9 @@ from constants import BLOG_URL
 
 FEED_URL = f"{BLOG_URL}/feeds/posts/default"
 
-MESES_ES = [
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+MONTHS_EN = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
 ]
 
 # Rango de puntos de código que cubre la mayoría de emojis/pictogramas.
@@ -81,13 +81,13 @@ def _strip_html(html_content):
 
 
 def format_date_es(published_iso):
-    """Convierte '2026-07-22T10:00:00.000+02:00' en '22 de julio de 2026'."""
+    """Converts '2026-07-22T10:00:00.000+02:00' into 'July 22, 2026'."""
     if not published_iso:
         return ""
     try:
         cleaned = published_iso.split(".")[0].split("+")[0]
         dt = datetime.strptime(cleaned, "%Y-%m-%dT%H:%M:%S")
-        return f"{dt.day} de {MESES_ES[dt.month - 1]} de {dt.year}"
+        return f"{MONTHS_EN[dt.month - 1]} {dt.day}, {dt.year}"
     except Exception:
         return ""
 
