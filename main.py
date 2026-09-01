@@ -1,7 +1,7 @@
 """
-Kocina del Mundo
-App nativa que refleja fielmente la estructura de
-https://kocinadelmundo24.blogspot.com (recetas cargadas en vivo desde Blogger).
+Recipes Method
+Native app that closely mirrors the structure of
+https://recipesmethod24.blogspot.com (recipes loaded live from Blogger).
 """
 
 import webbrowser
@@ -24,7 +24,7 @@ from kivy.uix.dropdown import DropDown
 from kivy.graphics import Color, RoundedRectangle, Ellipse, Line
 
 from constants import (
-    CATEGORIES, BLOG_URL,
+    CATEGORIES, CATEGORY_LABELS_EN, BLOG_URL,
     COLOR_BG, COLOR_PRIMARY, COLOR_PRIMARY_DARK, COLOR_ACCENT,
     COLOR_DANGER, COLOR_TEXT, COLOR_CARD, COLOR_WHITE,
 )
@@ -111,7 +111,7 @@ def make_header():
         logo = LogoImage(texture=logo_texture, size_hint=(None, None),
                           width=LOGO_WIDTH, height=LOGO_HEIGHT)
     else:
-        logo = Label(text="Kocina del Mundo", font_size="22sp", bold=True, color=COLOR_PRIMARY)
+        logo = Label(text="Recipes Method", font_size="22sp", bold=True, color=COLOR_PRIMARY)
     logo_anchor.add_widget(logo)
     header.add_widget(logo_anchor)
     return header
@@ -119,7 +119,7 @@ def make_header():
 
 def make_back_row(on_back):
     row = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(8), dp(4)))
-    back_btn = flat_button("< Volver", height=dp(32), font_size="12sp")
+    back_btn = flat_button("< Back", height=dp(32), font_size="12sp")
     back_btn.size_hint_x = None
     back_btn.width = dp(90)
     if on_back:
@@ -129,8 +129,8 @@ def make_back_row(on_back):
 
 
 def make_detail_back_row(on_back):
-    """Barra de regreso para la pantalla de detalle: fondo negro, botón
-    blanco con texto negro, solo la palabra 'Volver' sin flecha."""
+    """Back bar for the detail screen: black background, white
+    button with black text, just the word 'Back' with no arrow."""
     row = BoxLayout(size_hint_y=None, height=dp(48), padding=(dp(10), dp(6)))
     with row.canvas.before:
         Color(0, 0, 0, 1)
@@ -140,7 +140,7 @@ def make_detail_back_row(on_back):
 
     back_btn = RoundButton(size_hint=(None, None), width=dp(90), height=dp(34))
     back_btn._color_instr.rgba = (1, 1, 1, 1)
-    back_btn._label.text = "Volver"
+    back_btn._label.text = "Back"
     back_btn._label.color = (0, 0, 0, 1)
     back_btn._label.font_size = "12sp"
     if on_back:
@@ -158,7 +158,7 @@ def show_subcategory_dropdown(anchor_widget, main_category, on_select):
 
     for sub in subcats:
         item = Button(
-            text=sub, size_hint_y=None, height=dp(30),
+            text=CATEGORY_LABELS_EN.get(sub, sub), size_hint_y=None, height=dp(30),
             background_normal="", background_down="",
             background_color=COLOR_WHITE, color=COLOR_TEXT,
             font_size="11sp", bold=True,
@@ -186,7 +186,8 @@ def make_category_row(on_subcategory_select):
         cat_row.bind(pos=lambda i, v: setattr(rect, "pos", v))
         cat_row.bind(size=lambda i, v: setattr(rect, "size", v))
     for cat_name in CATEGORIES.keys():
-        btn = CategoryButton(cat_name, icon_texture=get_icon_texture(cat_name), size_hint_x=1)
+        btn = CategoryButton(CATEGORY_LABELS_EN.get(cat_name, cat_name),
+                              icon_texture=get_icon_texture(cat_name), size_hint_x=1)
         btn.bind(on_press=lambda inst, name=cat_name: show_subcategory_dropdown(
             inst, name, on_subcategory_select
         ))
@@ -333,7 +334,7 @@ def make_tagline_bar():
         bar.bind(pos=lambda i, v: setattr(rect, "pos", v))
         bar.bind(size=lambda i, v: setattr(rect, "size", v))
     bar.add_widget(Label(
-        text="NUEVAS RECETAS CADA HORA, PARA TI Y TU FAMILIA",
+        text="NEW RECIPES EVERY HOUR, FOR YOU AND YOUR FAMILY",
         font_size="11sp", color=COLOR_WHITE, bold=True,
     ))
     return bar
@@ -393,11 +394,11 @@ class RoundedInputWrap(BoxLayout):
         self._rect.size = self.size
 
 
-def loading_label(text="Cargando recetas..."):
+def loading_label(text="Loading recipes..."):
     return Label(text=text, color=COLOR_TEXT, size_hint_y=None, height=dp(60), font_size="15sp")
 
 
-def error_label(text="No se pudieron cargar las recetas. Revisa tu conexión."):
+def error_label(text="Couldn't load recipes. Check your connection."):
     return Label(text=text, color=COLOR_DANGER, size_hint_y=None, height=dp(100),
                  font_size="13sp", halign="center")
 
@@ -407,13 +408,13 @@ def make_about_section():
     box.bind(minimum_height=box.setter("height"))
 
     box.add_widget(autosize_label(
-        "Sobre Kocina del Mundo", font_size="19sp", bold=True,
+        "About Recipes Method", font_size="19sp", bold=True,
         color=COLOR_PRIMARY_DARK, width_padding=dp(28), halign="center",
     ))
     box.add_widget(autosize_label(
-        "Bienvenido a Kocina del Mundo, un rincón digital para viajar a través "
-        "del sabor: recetas caseras, técnicas tradicionales e historias de "
-        "cocinas de todo el planeta, explicadas paso a paso.",
+        "Welcome to Recipes Method, a digital corner for traveling through "
+        "flavor: home cooking, traditional techniques, and stories from "
+        "kitchens around the world, explained step by step.",
         font_size="14sp", width_padding=dp(28), halign="center",
     ))
     return box
@@ -427,7 +428,7 @@ def make_footer():
         rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[0])
         box.bind(pos=lambda i, v: setattr(rect, "pos", v))
         box.bind(size=lambda i, v: setattr(rect, "size", v))
-    box.add_widget(Label(text="@kocina del mundo. Buen provechi", color=COLOR_WHITE,
+    box.add_widget(Label(text="@recipesmethod. Enjoy your meal!", color=COLOR_WHITE,
                           font_size="12sp", size_hint_y=None, height=dp(24)))
     return box
 
@@ -481,14 +482,14 @@ class HomeScreen(Screen):
         search_bar = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), dp(4)), spacing=dp(8))
         input_wrap = RoundedInputWrap(radius=dp(20), size_hint=(1, None), height=dp(44))
         self.search_input = TextInput(
-            hint_text="Buscar recetas...", multiline=False,
+            hint_text="Search recipes...", multiline=False,
             background_normal="", background_active="", background_color=(0, 0, 0, 0),
             foreground_color=COLOR_TEXT, hint_text_color=(0.45, 0.42, 0.38, 1),
             cursor_color=COLOR_TEXT, padding=[dp(16), dp(11)],
         )
         self.search_input.bind(on_text_validate=self.do_search)
         input_wrap.add_widget(self.search_input)
-        search_btn = flat_button("Buscar", height=dp(44), font_size="13sp")
+        search_btn = flat_button("Search", height=dp(44), font_size="13sp")
         search_btn.size_hint = (None, None)
         search_btn.width = dp(90)
         search_btn.bind(on_press=self.do_search)
@@ -500,11 +501,11 @@ class HomeScreen(Screen):
                                   spacing=dp(10), padding=dp(14))
         results_wrap.bind(minimum_height=results_wrap.setter("height"))
         results_wrap.add_widget(section_title(
-            "Últimas recetas" if not posts else f"Últimas recetas ({len(posts)})"
+            "Latest recipes" if not posts else f"Latest recipes ({len(posts)})"
         ))
         if not posts:
             results_wrap.add_widget(Label(
-                text="No se encontraron recetas.", color=COLOR_TEXT,
+                text="No recipes found.", color=COLOR_TEXT,
                 size_hint_y=None, height=dp(40),
             ))
         for i, post in enumerate(posts):
@@ -521,8 +522,8 @@ class HomeScreen(Screen):
     def show_error(self, err):
         self.body.clear_widgets()
         self.body.add_widget(error_label(
-            "No se pudieron cargar las recetas. Revisa tu conexión.\n\n"
-            f"Detalle técnico: {err}"
+            "Couldn't load recipes. Check your connection.\n\n"
+            f"Technical detail: {err}"
         ))
 
     def do_search(self, instance):
@@ -573,7 +574,8 @@ class CategoryScreen(Screen):
         if icon_tex:
             title_row.add_widget(Image(texture=icon_tex, size_hint=(None, None), size=(dp(28), dp(28))))
         title_row.add_widget(autosize_label(
-            self.current_category or "", font_size="20sp", bold=True,
+            CATEGORY_LABELS_EN.get(self.current_category, self.current_category) or "",
+            font_size="20sp", bold=True,
             color=COLOR_PRIMARY_DARK, width_padding=dp(60),
         ))
         root.add_widget(title_row)
@@ -595,7 +597,7 @@ class CategoryScreen(Screen):
         self.results_grid.clear_widgets()
         if not posts:
             self.results_grid.add_widget(Label(
-                text="No hay recetas en esta categoría todavía.",
+                text="No recipes in this category yet.",
                 color=COLOR_TEXT, size_hint_y=None, height=dp(40),
             ))
         for post in posts:
@@ -604,8 +606,8 @@ class CategoryScreen(Screen):
     def show_error(self, err):
         self.results_grid.clear_widgets()
         self.results_grid.add_widget(error_label(
-            "No se pudieron cargar las recetas.\n\n"
-            f"Detalle técnico: {err}"
+            "Couldn't load recipes.\n\n"
+            f"Technical detail: {err}"
         ))
 
     def open_detail(self, post):
@@ -663,12 +665,12 @@ class RecipeDetailScreen(Screen):
             ))
 
         content.add_widget(autosize_label(
-            post.get("contenido_texto", "") or "Contenido no disponible.",
+            post.get("contenido_texto", "") or "Content not available.",
             font_size="15sp",
         ))
 
         if post.get("link"):
-            web_btn = flat_button("Ver receta completa en la web", COLOR_ACCENT, height=dp(48))
+            web_btn = flat_button("View full recipe on the web", COLOR_ACCENT, height=dp(48))
             web_btn.bind(on_press=lambda i: webbrowser.open(post["link"]))
             content.add_widget(web_btn)
 
@@ -699,7 +701,7 @@ class RecipeDetailScreen(Screen):
 
 class KocinaApp(App):
     def build(self):
-        self.title = "Kocina del Mundo"
+        self.title = "Recipes Method"
         sm = ScreenManager()
         sm.add_widget(HomeScreen(name="home"))
         sm.add_widget(CategoryScreen(name="category"))
