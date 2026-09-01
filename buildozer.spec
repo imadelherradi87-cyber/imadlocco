@@ -1,5 +1,5 @@
 [app]
-title = Kocina del Mundo
+title = Recipes Method
 package.name = kocinadelmundo
 package.domain = org.imadlocco
 source.dir = .
